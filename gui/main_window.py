@@ -13,16 +13,17 @@ from qtpy.QtWidgets import (
     QTextEdit,
 )
 from qtpy.QtCore import Qt
-from gui.collection_queue import CollectionQueue
+from gui.chip_widgets import Chip
 from gui.dialogs import LoadChipDialog
+from gui.collection_queue import CollectionQueueWidget
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, chip, parent=None):
+    def __init__(self, chip: Chip, parent=None):
         super(MainWindow, self).__init__(parent)
 
         self.chip = chip
-        self.setWindowTitle("chipgui")
+        self.setWindowTitle("ChipSight")
 
         # Main layout
         main_layout = QHBoxLayout()
@@ -54,27 +55,6 @@ class MainWindow(QMainWindow):
                 )
                 self.chip_grid.addWidget(btn, i, j)
         left_layout.addLayout(self.chip_grid)
-
-        # Add to queue Button
-        self.add_to_queue_button = QPushButton("Add to queue")
-        self.add_to_queue_button.clicked.connect(self.add_to_queue)
-        left_layout.addWidget(self.add_to_queue_button)
-
-        # Queue list
-        self.collection_queue = CollectionQueue()
-        self.queue_list = QListView()
-        self.queue_list.setModel(self.collection_queue)  # Queue model
-        left_layout.addWidget(self.queue_list)
-
-        # Clear queue Button
-        self.clear_queue_button = QPushButton("Clear queue")
-        self.clear_queue_button.clicked.connect(self.clear_queue)
-        left_layout.addWidget(self.clear_queue_button)
-
-        # Collect queue Button
-        self.collect_queue_button = QPushButton("Collect queue")
-        self.collect_queue_button.clicked.connect(self.collect_queue)
-        left_layout.addWidget(self.collect_queue_button)
 
         # Data collection parameters
         left_layout.addWidget(QLabel("Data collection parameters"))
@@ -140,6 +120,17 @@ class MainWindow(QMainWindow):
         self.status_window.setReadOnly(True)
         right_layout.addWidget(self.status_window)
 
+        self.last_selected = (0, 0)
+        self.last_selected_row = 0
+
+        self.collection_queue = CollectionQueueWidget(
+            self.chip,
+            self.last_selected,
+            self.collection_parameters,
+            self.status_window,
+        )
+        left_layout.addWidget(self.collection_queue)
+
         # Push the layouts up by adding stretch at the end
         left_layout.addStretch()
         right_layout.addStretch()
@@ -149,8 +140,6 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-        self.last_selected = (0, 0)
-        self.last_selected_row = 0
         self.update()
 
     def load_chip(self):
@@ -275,88 +264,6 @@ class MainWindow(QMainWindow):
             ].selected = True
         self.last_selected_row = x
         self.update()
-
-    # Add selected blocks and rows to queue
-    def add_to_queue(self):
-        last_block = self.chip.blocks[self.last_selected[0]][self.last_selected[1]]
-        selected_rows = [row for row in last_block.rows if row.selected]
-        if selected_rows:  # last selected block contains selected rows
-            for row in selected_rows:
-                row.queued = "queued"
-                self.collection_queue.add_to_queue(row.address)
-            last_block.queued = "partially queued"
-            if all(
-                row.queued == "queued" for row in last_block.rows[:-1]
-            ):  # exclude label row
-                last_block.queued = "queued"
-        else:  # last selected block does not contain selected rows
-            for block_row in self.chip.blocks:
-                for block in block_row:
-                    if block.selected:
-                        block.queued = "queued"
-                        for row in block.rows:
-                            row.queued = "queued"
-                        self.collection_queue.add_to_queue(block.address)
-        self.update()
-
-    # Clear the queue
-    def clear_queue(self):
-        for block_row in self.chip.blocks:
-            for block in block_row:
-                block.queued = "not queued"
-                for row in block.rows:
-                    row.queued = "not queued"
-        self.collection_queue.remove_from_queue()
-        self.update()
-
-    def collect_queue(self):
-        while self.collection_queue.queue:
-            container_address = self.collection_queue.queue.pop(0)
-            if len(container_address) == 2:  # it's a block
-                self.collect_block(container_address)
-            else:  # it's a row
-                self.collect_row(container_address)
-        self.update()
-
-    def collect_block(self, block_address):
-        x = ord(block_address[0]) - 65
-        y = int(block_address[1:]) - 1
-        block = self.chip.blocks[x][y]
-        block.exposed = "exposed"
-        block.queued = "not queued"
-        for row in block.rows:
-            row.exposed = "exposed"
-            row.queued = "not queued"
-        exposure_time = self.collection_parameters["exposure_time"]["widget"].text()
-        exposure_time_label = self.collection_parameters["exposure_time"]["label"]
-        self.status_window.append(
-            f"Collecting block {block_address} with {exposure_time_label} = {exposure_time}"
-        )
-
-    def collect_row(self, row_address):
-        x = ord(row_address[0]) - 65
-        y = int(row_address[1]) - 1
-        row_id = ord(row_address[2]) - 97
-        row = self.chip.blocks[x][y].rows[row_id]
-        row.exposed = "exposed"
-        row.queued = "not queued"
-        exposure_time = self.collection_parameters["exposure_time"]["widget"].text()
-        exposure_time_label = self.collection_parameters["exposure_time"]["label"]
-        self.status_window.append(
-            f"Collecting row {row_address} with {exposure_time_label} = {exposure_time}"
-        )
-
-        block = self.chip.blocks[x][y]
-        if block.exposed == "not exposed":
-            block.exposed = "partially exposed"
-        if all(
-            row.exposed == "exposed" for row in block.rows[:-1]
-        ):  # exclude label row
-            block.exposed = "exposed"
-        if all(
-            row.queued == "not queued" for row in block.rows[:-1]
-        ):  # exclude label row
-            block.queued = "not queued"
 
     def update_button_style(
         self, button, size, selected=False, queued="not queued", exposed="not exposed"
