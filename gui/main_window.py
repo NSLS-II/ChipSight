@@ -1,4 +1,5 @@
 import re
+from typing import Dict, Any
 from qtpy.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -8,7 +9,6 @@ from qtpy.QtWidgets import (
     QGridLayout,
     QPushButton,
     QLabel,
-    QListView,
     QLineEdit,
     QTextEdit,
 )
@@ -19,10 +19,11 @@ from gui.collection_queue import CollectionQueueWidget
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, chip: Chip, parent=None):
+    def __init__(self, chip: Chip, config: Dict[str, Any], parent=None):
         super(MainWindow, self).__init__(parent)
 
         self.chip = chip
+        self.config = config
         self.setWindowTitle("ChipSight")
 
         # Main layout
@@ -42,11 +43,13 @@ class MainWindow(QMainWindow):
 
         # Chip Grid
         self.chip_grid = QGridLayout()
+        button_size = self.config["chip_grid"]["button_size"]
+        print(button_size)
         for i in range(8):
             for j in range(8):
                 block_address = f"{chr(65+i)}{j+1}"
                 btn = QPushButton(block_address)
-                btn.setFixedSize(60, 60)
+                btn.setFixedSize(button_size, button_size)
                 btn.setFlat(True)  # Add this line to make the button appear flat
                 btn.clicked.connect(
                     lambda _, x=i, y=j: self.select_block(
@@ -89,6 +92,7 @@ class MainWindow(QMainWindow):
         # Block Grid
         self.block_grid = QGridLayout()
         self.block_buttons = {}
+        button_size = self.config["block_grid"]["button_size"]
         for i in range(21):  # Additional row for labels
             for j in range(21):  # Additional column for labels
                 if i == 0 and j > 0:  # Top labels
@@ -97,7 +101,7 @@ class MainWindow(QMainWindow):
                     self.block_grid.addWidget(label, i, j)
                 elif j == 0 and i > 0:  # Side labels
                     label_button = QPushButton(chr(96 + i))
-                    label_button.setFixedSize(30, 30)
+                    label_button.setFixedSize(button_size, button_size)
                     label_button.setFlat(
                         True
                     )  # Add this line to make the button appear flat
@@ -109,7 +113,7 @@ class MainWindow(QMainWindow):
                     self.block_grid.addWidget(label_button, i, j)
                 elif i > 0 and j > 0:  # Block buttons
                     btn = QPushButton()  # No address on button
-                    btn.setFixedSize(30, 30)
+                    btn.setFixedSize(button_size, button_size)
                     btn.setFlat(True)  # Add this line to make the button appear flat
                     self.block_buttons[(i, j)] = btn
                     self.block_grid.addWidget(btn, i, j)
@@ -322,7 +326,11 @@ class MainWindow(QMainWindow):
                 btn = self.chip_grid.itemAtPosition(i, j).widget()
                 block = self.chip.blocks[i][j]
                 self.update_button_style(
-                    btn, 60, block.selected, block.queued, block.exposed
+                    btn,
+                    self.config["chip_grid"]["button_size"],
+                    block.selected,
+                    block.queued,
+                    block.exposed,
                 )
 
         # update block label
@@ -338,7 +346,11 @@ class MainWindow(QMainWindow):
                         self.last_selected[1]
                     ].rows[i - 1]
                     self.update_button_style(
-                        btn, 30, row.selected, row.queued, row.exposed
+                        btn,
+                        self.config["block_grid"]["button_size"],
+                        row.selected,
+                        row.queued,
+                        row.exposed,
                     )
                 elif i == 0 and j > 0:
                     label = self.block_grid.itemAtPosition(i, j).widget()
@@ -349,5 +361,9 @@ class MainWindow(QMainWindow):
                         self.last_selected[1]
                     ].rows[i - 1]
                     self.update_button_style(
-                        label_button, 30, row.selected, row.queued, row.exposed
+                        label_button,
+                        self.config["block_grid"]["button_size"],
+                        row.selected,
+                        row.queued,
+                        row.exposed,
                     )
