@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Tuple
 from qtpy.QtCore import Qt, QAbstractListModel, QModelIndex
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView, QTextEdit
-from gui.chip_widgets import Chip
+from model.chip import Chip
 
 
 class CollectionQueue(QAbstractListModel):
@@ -66,6 +66,9 @@ class CollectionQueueWidget(QWidget):
         self.collect_queue_button = QPushButton("Collect queue")
         self.collect_queue_button.clicked.connect(self.collect_queue)
         self.layout().addWidget(self.collect_queue_button)
+
+    def set_last_selected(self, last_selected: Tuple[int, int]):
+        self.last_selected = last_selected
 
     # Add selected blocks and rows to queue
     def add_to_queue(self):
