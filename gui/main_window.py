@@ -20,6 +20,7 @@ from gui.dialogs import LoadChipDialog
 from gui.collection_queue import CollectionQueueWidget
 from gui.chip_widgets import ChipGridWidget, BlockGridWidget
 from gui.websocket_client import WebSocketClient
+from model.comm_protocol import Protocol
 
 
 class MainWindow(QMainWindow):
@@ -119,6 +120,9 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+        # Setup protocol
+        self.p = Protocol()
+
         self.update()
 
     def set_last_selected(self, value: "tuple[int, int]"):
@@ -129,14 +133,22 @@ class MainWindow(QMainWindow):
 
     def handle_server_message(self, message: str):
         data = json.loads(message)
-        if "broadcast" in data:
-            bcast_data = data["broadcast"]
-            if "add_queue" in bcast_data:
-                req = bcast_data["add_queue"]["request"]
-                user = bcast_data["add_queue"]["user"]
-                self.collection_queue.collection_queue.add_to_queue(req)
+        if self.p.Labels.BROADCAST.value in data:
+            bcast_data = data[self.p.Labels.BROADCAST.value]
+            if self.p.Labels.ACTION.value in bcast_data:
+                action = bcast_data[self.p.Labels.ACTION.value]
+                metadata = bcast_data[self.p.Labels.METADATA.value]
+                if action == self.p.Actions.ADD_TO_QUEUE.value:
+                    req = metadata[self.p.Labels.REQUEST.value]
+                    self.collection_queue.collection_queue.add_to_queue(
+                        req[self.p.Labels.ADDRESS.value]
+                    )
+                if action == self.p.Actions.CLEAR_QUEUE.value:
+                    self.collection_queue.collection_queue.queue = []
+
+            if self.p.Labels.STATUS_MSG.value in bcast_data:
                 self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : User {user} added {req}"
+                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Labels.STATUS_MSG.value]}"
                 )
         print(data)
 

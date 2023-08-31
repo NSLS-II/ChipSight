@@ -4,7 +4,9 @@ from typing import List, Dict, Any, Tuple
 from qtpy.QtCore import Qt, QAbstractListModel, QModelIndex
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView, QTextEdit
 from model.chip import Chip
+from model.comm_protocol import Protocol
 from .websocket_client import WebSocketClient
+from .utils import send_message_to_server
 
 
 class CollectionQueue(QAbstractListModel):
@@ -49,6 +51,7 @@ class CollectionQueueWidget(QWidget):
         super().__init__()
         self.setLayout(QVBoxLayout())
         self._init_ui()
+        self.p = Protocol()
 
     def _init_ui(self):
         # Add to queue Button
@@ -82,13 +85,16 @@ class CollectionQueueWidget(QWidget):
         if selected_rows:  # last selected block contains selected rows
             for row in selected_rows:
                 row.queued = "queued"
-                # self.collection_queue.add_to_queue(row.address)
-                asyncio.run_coroutine_threadsafe(
-                    self.websocket_client.send(
-                        json.dumps({"add_queue": f"{row.address}"})
-                    ),
-                    self.websocket_client.loop,
+                send_message_to_server(
+                    self.websocket_client,
+                    {
+                        self.p.Labels.ACTION.value: self.p.Actions.ADD_TO_QUEUE.value,
+                        self.p.Labels.METADATA.value: {
+                            self.p.Labels.ADDRESS.value: row.address
+                        },
+                    },
                 )
+
             last_block.queued = "partially queued"
             if all(
                 row.queued == "queued" for row in last_block.rows[:-1]
@@ -101,17 +107,23 @@ class CollectionQueueWidget(QWidget):
                         block.queued = "queued"
                         for row in block.rows:
                             row.queued = "queued"
-                        # self.collection_queue.add_to_queue(block.address)
-                        asyncio.run_coroutine_threadsafe(
-                            self.websocket_client.send(
-                                json.dumps({"add_queue": f"{block.address}"})
-                            ),
-                            self.websocket_client.loop,
+                        send_message_to_server(
+                            self.websocket_client,
+                            {
+                                self.p.Labels.ACTION.value: self.p.Actions.ADD_TO_QUEUE.value,  # "add_to_queue",
+                                self.p.Labels.METADATA.value: {
+                                    self.p.Labels.ADDRESS.value: block.address
+                                },
+                            },
                         )
         self.update()
 
     # Clear the queue
     def clear_queue(self):
+        send_message_to_server(
+            self.websocket_client,
+            {self.p.Labels.ACTION.value: self.p.Actions.CLEAR_QUEUE.value},
+        )
         for block_row in self.chip.blocks:
             for block in block_row:
                 block.queued = "not queued"
@@ -121,6 +133,10 @@ class CollectionQueueWidget(QWidget):
         self.update()
 
     def collect_queue(self):
+        send_message_to_server(
+            self.websocket_client,
+            {self.p.Labels.ACTION.value: self.p.Actions.COLLECT_QUEUE.value},
+        )
         while self.collection_queue.queue:
             container_address = self.collection_queue.queue.pop(0)
             if len(container_address) == 2:  # it's a block

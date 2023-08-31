@@ -1,4 +1,8 @@
+from typing import Dict, Any
 from qtpy.QtWidgets import QWidget
+from .websocket_client import WebSocketClient
+import asyncio
+import json
 
 
 def update_button_style(
@@ -50,3 +54,10 @@ def update_button_style(
     style += f"background-color: {base_color}; border: 3px solid {border_color};"
     button.setStyleSheet(style)
     return button
+
+
+def send_message_to_server(client: WebSocketClient, data: Dict[str, Any]):
+    asyncio.run_coroutine_threadsafe(
+        client.send(json.dumps(data)),
+        client.loop,
+    )
