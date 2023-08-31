@@ -1,7 +1,10 @@
+import json
+import asyncio
 from typing import List, Dict, Any, Tuple
 from qtpy.QtCore import Qt, QAbstractListModel, QModelIndex
 from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView, QTextEdit
 from model.chip import Chip
+from .websocket_client import WebSocketClient
 
 
 class CollectionQueue(QAbstractListModel):
@@ -36,11 +39,13 @@ class CollectionQueueWidget(QWidget):
         last_selected: Tuple[int, int],
         collection_parameters: Dict[str, Any],
         status_window: QTextEdit,
+        websocket_client: WebSocketClient,
     ):
         self.chip = chip
         self.last_selected = last_selected
         self.collection_parameters = collection_parameters
         self.status_window = status_window
+        self.websocket_client = websocket_client
         super().__init__()
         self.setLayout(QVBoxLayout())
         self._init_ui()
@@ -77,7 +82,13 @@ class CollectionQueueWidget(QWidget):
         if selected_rows:  # last selected block contains selected rows
             for row in selected_rows:
                 row.queued = "queued"
-                self.collection_queue.add_to_queue(row.address)
+                # self.collection_queue.add_to_queue(row.address)
+                asyncio.run_coroutine_threadsafe(
+                    self.websocket_client.send(
+                        json.dumps({"add_queue": f"{row.address}"})
+                    ),
+                    self.websocket_client.loop,
+                )
             last_block.queued = "partially queued"
             if all(
                 row.queued == "queued" for row in last_block.rows[:-1]
@@ -90,7 +101,13 @@ class CollectionQueueWidget(QWidget):
                         block.queued = "queued"
                         for row in block.rows:
                             row.queued = "queued"
-                        self.collection_queue.add_to_queue(block.address)
+                        # self.collection_queue.add_to_queue(block.address)
+                        asyncio.run_coroutine_threadsafe(
+                            self.websocket_client.send(
+                                json.dumps({"add_queue": f"{block.address}"})
+                            ),
+                            self.websocket_client.loop,
+                        )
         self.update()
 
     # Clear the queue

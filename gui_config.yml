@@ -2,3 +2,6 @@ chip_grid:
   button_size: 30
 block_grid:
   button_size: 15
+server:
+  url: "127.0.0.1"
+  port: 8000

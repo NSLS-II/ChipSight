@@ -1,4 +1,5 @@
 import re
+import json
 from typing import Dict, Any
 from qtpy.QtWidgets import (
     QApplication,
@@ -12,12 +13,13 @@ from qtpy.QtWidgets import (
     QLineEdit,
     QTextEdit,
 )
+from datetime import datetime
 from qtpy.QtCore import Qt
 from model.chip import Chip
 from gui.dialogs import LoadChipDialog
 from gui.collection_queue import CollectionQueueWidget
 from gui.chip_widgets import ChipGridWidget, BlockGridWidget
-from gui.utils import update_button_style
+from gui.websocket_client import WebSocketClient
 
 
 class MainWindow(QMainWindow):
@@ -26,6 +28,13 @@ class MainWindow(QMainWindow):
 
         self.chip = chip
         self.config = config
+
+        self.websocket_client = WebSocketClient(
+            server_url=config["server"]["url"], server_port=config["server"]["port"]
+        )
+        self.websocket_client.message_received.connect(self.handle_server_message)
+        self.websocket_client.start()
+
         self.setWindowTitle("ChipSight")
 
         # Main layout
@@ -97,6 +106,7 @@ class MainWindow(QMainWindow):
             self.last_selected,
             self.collection_parameters,
             self.status_window,
+            self.websocket_client,
         )
         left_layout.addWidget(self.collection_queue)
 
@@ -116,6 +126,19 @@ class MainWindow(QMainWindow):
         self.block_grid.set_last_selected(value)
         self.collection_queue.set_last_selected(value)
         self.update()
+
+    def handle_server_message(self, message: str):
+        data = json.loads(message)
+        if "broadcast" in data:
+            bcast_data = data["broadcast"]
+            if "add_queue" in bcast_data:
+                req = bcast_data["add_queue"]["request"]
+                user = bcast_data["add_queue"]["user"]
+                self.collection_queue.collection_queue.add_to_queue(req)
+                self.status_window.append(
+                    f"{datetime.now().strftime('%H:%M:%S')} : User {user} added {req}"
+                )
+        print(data)
 
     def load_chip(self):
         dialog = LoadChipDialog(self)
