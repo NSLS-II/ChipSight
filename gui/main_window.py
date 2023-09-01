@@ -133,22 +133,22 @@ class MainWindow(QMainWindow):
 
     def handle_server_message(self, message: str):
         data = json.loads(message)
-        if self.p.Labels.BROADCAST.value in data:
-            bcast_data = data[self.p.Labels.BROADCAST.value]
-            if self.p.Labels.ACTION.value in bcast_data:
-                action = bcast_data[self.p.Labels.ACTION.value]
-                metadata = bcast_data[self.p.Labels.METADATA.value]
-                if action == self.p.Actions.ADD_TO_QUEUE.value:
-                    req = metadata[self.p.Labels.REQUEST.value]
+        if self.p.Labels.BROADCAST in data:
+            bcast_data = data[self.p.Labels.BROADCAST]
+            if self.p.Labels.ACTION in bcast_data:
+                action = bcast_data[self.p.Labels.ACTION]
+                metadata = bcast_data[self.p.Labels.METADATA]
+                if action == self.p.Actions.ADD_TO_QUEUE:
+                    req = metadata[self.p.Labels.REQUEST]
                     self.collection_queue.collection_queue.add_to_queue(
-                        req[self.p.Labels.ADDRESS.value]
+                        req[self.p.Labels.ADDRESS]
                     )
-                if action == self.p.Actions.CLEAR_QUEUE.value:
+                if action == self.p.Actions.CLEAR_QUEUE:
                     self.collection_queue.collection_queue.queue = []
 
-            if self.p.Labels.STATUS_MSG.value in bcast_data:
+            if self.p.Labels.STATUS_MSG in bcast_data:
                 self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Labels.STATUS_MSG.value]}"
+                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Labels.STATUS_MSG]}"
                 )
         print(data)
 

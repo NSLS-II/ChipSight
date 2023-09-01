@@ -1,9 +1,8 @@
-from enum import Enum, EnumMeta
 from dataclasses import dataclass
-from typing import Literal
 
 
-class Labels(Enum):
+@dataclass(frozen=True)
+class Labels:
     ACTION = "action"
     METADATA = "metadata"
     USER = "user"
@@ -14,13 +13,15 @@ class Labels(Enum):
     ADDRESS = "address"
 
 
-class Actions(Enum):
+@dataclass(frozen=True)
+class Actions:
     ADD_TO_QUEUE = "add_to_queue"
     COLLECT_QUEUE = "collect_queue"
     CLEAR_QUEUE = "clear_queue"
 
 
-class Status(Enum):
+@dataclass(frozen=True)
+class Status:
     SUCCESS = "success"
     FAILURE = "failure"
 

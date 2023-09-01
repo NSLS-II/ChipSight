@@ -88,10 +88,8 @@ class CollectionQueueWidget(QWidget):
                 send_message_to_server(
                     self.websocket_client,
                     {
-                        self.p.Labels.ACTION.value: self.p.Actions.ADD_TO_QUEUE.value,
-                        self.p.Labels.METADATA.value: {
-                            self.p.Labels.ADDRESS.value: row.address
-                        },
+                        self.p.Labels.ACTION: self.p.Actions.ADD_TO_QUEUE,
+                        self.p.Labels.METADATA: {self.p.Labels.ADDRESS: row.address},
                     },
                 )
 
@@ -110,9 +108,9 @@ class CollectionQueueWidget(QWidget):
                         send_message_to_server(
                             self.websocket_client,
                             {
-                                self.p.Labels.ACTION.value: self.p.Actions.ADD_TO_QUEUE.value,  # "add_to_queue",
-                                self.p.Labels.METADATA.value: {
-                                    self.p.Labels.ADDRESS.value: block.address
+                                self.p.Labels.ACTION: self.p.Actions.ADD_TO_QUEUE,  # "add_to_queue",
+                                self.p.Labels.METADATA: {
+                                    self.p.Labels.ADDRESS: block.address
                                 },
                             },
                         )
@@ -122,7 +120,7 @@ class CollectionQueueWidget(QWidget):
     def clear_queue(self):
         send_message_to_server(
             self.websocket_client,
-            {self.p.Labels.ACTION.value: self.p.Actions.CLEAR_QUEUE.value},
+            {self.p.Labels.ACTION: self.p.Actions.CLEAR_QUEUE},
         )
         for block_row in self.chip.blocks:
             for block in block_row:
@@ -135,7 +133,7 @@ class CollectionQueueWidget(QWidget):
     def collect_queue(self):
         send_message_to_server(
             self.websocket_client,
-            {self.p.Labels.ACTION.value: self.p.Actions.COLLECT_QUEUE.value},
+            {self.p.Labels.ACTION: self.p.Actions.COLLECT_QUEUE},
         )
         while self.collection_queue.queue:
             container_address = self.collection_queue.queue.pop(0)
