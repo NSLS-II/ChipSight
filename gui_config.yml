@@ -1,7 +1,7 @@
 chip_grid:
-  button_size: 30
+  button_size: 40
 block_grid:
-  button_size: 15
+  button_size: 20
 server:
-  url: "127.0.0.1"
+  url: "xf17id2-srv2.nsls2.bnl.local"
   port: 8000

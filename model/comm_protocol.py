@@ -18,6 +18,7 @@ class Actions:
     ADD_TO_QUEUE = "add_to_queue"
     COLLECT_QUEUE = "collect_queue"
     CLEAR_QUEUE = "clear_queue"
+    MOVE_GONIO = "move_gonio"
 
 
 @dataclass(frozen=True)

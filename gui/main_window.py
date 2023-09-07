@@ -22,6 +22,8 @@ from gui.chip_widgets import ChipGridWidget, BlockGridWidget
 from gui.websocket_client import WebSocketClient
 from model.comm_protocol import Protocol
 
+from gui.microscope.microscope import Microscope
+
 
 class MainWindow(QMainWindow):
     def __init__(self, chip: Chip, config: Dict[str, Any], parent=None):
@@ -85,6 +87,14 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout()
         main_layout.addLayout(right_layout)
 
+        #Setup Q microscope
+        self.microscope = Microscope(self, viewport=False)
+        self.microscope.scale = [0, 400]
+        self.microscope.fps = 30
+        self.microscope.url = "http://xf17id2c-webcam2/mjpg/video.mjpg"
+        right_layout.addWidget(self.microscope)
+        self.microscope.acquire(True)
+
         # Block Label
         self.block_label = QLabel("Current city block: A1")
         right_layout.addWidget(self.block_label)
@@ -97,7 +107,7 @@ class MainWindow(QMainWindow):
         # Status window
         self.status_window = QTextEdit()
         self.status_window.setReadOnly(True)
-        right_layout.addWidget(self.status_window)
+        left_layout.addWidget(self.status_window)
 
         self.last_selected = (0, 0)
         self.last_selected_row = 0
@@ -123,6 +133,7 @@ class MainWindow(QMainWindow):
         # Setup protocol
         self.p = Protocol()
 
+        
         self.update()
 
     def set_last_selected(self, value: "tuple[int, int]"):

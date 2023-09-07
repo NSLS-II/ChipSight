@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 from server.message_manager import ChipScannerMessageManager
 from server.manager import ConnectionManager
 
@@ -7,9 +8,19 @@ conn_manager = ConnectionManager()
 csm_manager = ChipScannerMessageManager(connection_manager=conn_manager)
 
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    return {"message": " Hello world "}
+    return  """
+            <html>
+                <head>
+                    <title> Chip scanner server </title>
+                </head>
+                <body>
+                    <h1> Welcome to the chip scanner server </h1>
+                </body>
+
+            </html>
+            """
 
 
 @app.websocket("/ws/{client_id}/{user_id}")
