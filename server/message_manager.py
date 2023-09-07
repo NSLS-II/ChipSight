@@ -2,6 +2,7 @@ from typing import Dict, Any
 from .manager import ConnectionManager
 from queue import Queue
 from model.comm_protocol import Protocol
+import start_bs
 
 
 class ChipScannerMessageManager:
