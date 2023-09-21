@@ -11,6 +11,7 @@ class Labels:
     STATUS_MSG = "status_message"
     BROADCAST = "broadcast"
     ADDRESS = "address"
+    MOVE_GONIO = "move_gonio"
 
 
 @dataclass(frozen=True)

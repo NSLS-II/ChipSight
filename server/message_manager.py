@@ -2,7 +2,7 @@ from typing import Dict, Any
 from .manager import ConnectionManager
 from queue import Queue
 from model.comm_protocol import Protocol
-import start_bs
+from server import start_bs
 
 
 class ChipScannerMessageManager:
@@ -16,10 +16,12 @@ class ChipScannerMessageManager:
         action = data[self.p.Labels.ACTION]
         if action == self.p.Actions.ADD_TO_QUEUE:
             await self.add_to_queue(data, user_id)
-        if action == self.p.Actions.COLLECT_QUEUE:
+        elif action == self.p.Actions.COLLECT_QUEUE:
             await self.collect_queue(data, user_id)
-        if action == self.p.Actions.CLEAR_QUEUE:
+        elif action == self.p.Actions.CLEAR_QUEUE:
             await self.clear_queue(data, user_id)
+        elif action == self.p.Labels.MOVE_GONIO:
+            await self.move_gonio(data, user_id)
 
     """
     Other unimplemented commands:
@@ -28,12 +30,34 @@ class ChipScannerMessageManager:
      - Run immediately: E.g. click to center
     """
 
+    async def move_gonio(self, data: Dict[str, Any], user_id: str):
+        
+        start_bs.gonio2.move_gonio(data[self.p.Labels.METADATA]["x"], 
+                                   data[self.p.Labels.METADATA]["y"], 
+                                   data[self.p.Labels.METADATA]["z"])
+        
+        await self.conn_manager.broadcast({
+                self.p.Labels.STATUS_MSG: f"{user_id} moved gonio to {data[self.p.Labels.METADATA]}",
+                self.p.Labels.STATUS: self.p.Status.SUCCESS,
+            })
+
+
     async def add_to_queue(self, data: Dict[str, Any], user_id: str):
         """
         Adds request to queue, then broadcasts to all clients that a request has been added
         """
 
         self.request_queue.put(data[self.p.Labels.METADATA])
+        # Move light temporary testing only!
+        """
+        print(f"Light value: {start_bs.light.y.get().user_readback}")
+        if abs(start_bs.light.y.get().user_readback - (-100)) < 0.1 :
+            print("Moving light to -50")
+            start_bs.RE(start_bs.bsps.mv(start_bs.light.y, -50))
+        elif abs(start_bs.light.y.get().user_readback - (-50)) < 0.1: 
+            start_bs.RE(start_bs.bsps.mv(start_bs.light.y, -100))
+            print("Moving light to -100")
+        """
         await self.conn_manager.broadcast(
             {
                 self.p.Labels.ACTION: self.p.Actions.ADD_TO_QUEUE,

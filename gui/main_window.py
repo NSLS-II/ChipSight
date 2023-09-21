@@ -1,6 +1,7 @@
 import re
 import json
 from typing import Dict, Any
+from PyQt5 import QtGui
 from qtpy.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -14,7 +15,7 @@ from qtpy.QtWidgets import (
     QTextEdit,
 )
 from datetime import datetime
-from qtpy.QtCore import Qt
+from qtpy import QtCore
 from model.chip import Chip
 from gui.dialogs import LoadChipDialog
 from gui.collection_queue import CollectionQueueWidget
@@ -23,12 +24,14 @@ from gui.websocket_client import WebSocketClient
 from model.comm_protocol import Protocol
 
 from gui.microscope.microscope import Microscope
+from gui.microscope.plugins.c2c_plugin import C2CPlugin
 
 
 class MainWindow(QMainWindow):
     def __init__(self, chip: Chip, config: Dict[str, Any], parent=None):
         super(MainWindow, self).__init__(parent)
 
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.chip = chip
         self.config = config
 
@@ -88,10 +91,10 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_layout)
 
         #Setup Q microscope
-        self.microscope = Microscope(self, viewport=False)
+        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin])
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
-        self.microscope.url = "http://xf17id2c-webcam2/mjpg/video.mjpg"
+        self.microscope.url = self.config["sample_cam"]["url"]
         right_layout.addWidget(self.microscope)
         self.microscope.acquire(True)
 
@@ -135,6 +138,14 @@ class MainWindow(QMainWindow):
 
         
         self.update()
+
+    def clean_up(self):
+        self.microscope.acquire(False)
+
+    def closeEvent(self, event) -> None:
+        self.clean_up()
+        event.accept()
+        
 
     def set_last_selected(self, value: "tuple[int, int]"):
         self.last_selected = value
