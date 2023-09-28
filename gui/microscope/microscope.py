@@ -1,10 +1,10 @@
 from collections.abc import Iterable
-from qtpy.QtCore import Signal, QByteArray, QPoint, QSize, QSettings, QEvent
+from qtpy.QtCore import Signal, QByteArray, QPoint, QSize, QSettings, QEvent  # type: ignore
 from qtpy.QtGui import QImage, QPainter, QContextMenuEvent, QMouseEvent, QPixmap
 from qtpy.QtWidgets import (
     QWidget,
     QMenu,
-    QAction,
+    QAction,  # type: ignore
     QGraphicsView,
     QGraphicsScene,
     QGraphicsPixmapItem,
@@ -38,11 +38,12 @@ class Microscope(QWidget):
         self.pixmap = QGraphicsPixmapItem(None)
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
-        self.view.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        self.view.setRenderHints(
+            QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform  # type: ignore
+        )
         self.scene.addItem(self.pixmap)
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.view)
-        self.setLayout(self.layout)
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(self.view)
         self.settings_group = None
 
         self.yDivs: int = 5
@@ -106,13 +107,13 @@ class Microscope(QWidget):
 
     def eventFilter(self, obj, event):
         if obj is self.view.viewport():
-            if event.type() == QEvent.MouseButtonPress:
+            if event.type() == QEvent.Type.MouseButtonPress:
                 self.mouse_press_event(event)
-            if event.type() == QEvent.MouseButtonRelease:
+            if event.type() == QEvent.Type.MouseButtonRelease:
                 self.mouse_release_event(event)
-            if event.type() == QEvent.MouseMove:
+            if event.type() == QEvent.Type.MouseMove:
                 self.mouse_move_event(event)
-            if event.type() == QEvent.Wheel:
+            if event.type() == QEvent.Type.Wheel:
                 self.mouse_wheel_event(event)
         return QWidget.eventFilter(self, obj, event)
 
@@ -122,8 +123,8 @@ class Microscope(QWidget):
         zoomOutFactor = 1 / zoomInFactor
 
         # Set Anchors
-        self.view.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self.view.setResizeAnchor(QGraphicsView.NoAnchor)
+        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        self.view.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
         # Save the scene pos
         oldPos = self.view.mapToScene(event.pos())

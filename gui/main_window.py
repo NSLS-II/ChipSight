@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
     def __init__(self, chip: Chip, config: Dict[str, Any], parent=None):
         super(MainWindow, self).__init__(parent)
 
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setAttribute(QtCore.Qt.WidgetAttribute.WA_DeleteOnClose)
         self.chip = chip
         self.config = config
         self.server_url = f'{config["server"]["url"]}:{config["server"]["port"]}'
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_layout)
 
         # Setup Q microscope
-        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin])
+        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin])  # type: ignore
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
         self.microscope.url = self.config["sample_cam"]["url"]
@@ -193,7 +193,6 @@ class MainWindow(QMainWindow):
                 self.status_window.append(
                     f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[self.p.Key.STATUS_MSG]}"
                 )
-        
 
     def load_chip(self):
         dialog = LoadChipDialog(self)

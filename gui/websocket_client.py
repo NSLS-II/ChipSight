@@ -4,7 +4,7 @@ import os
 import getpass
 from PyQt5.QtCore import QObject
 import websockets
-from qtpy.QtCore import QThread, Signal
+from qtpy.QtCore import QThread, Signal  # type: ignore
 from fastapi.exceptions import WebSocketRequestValidationError
 from uuid import uuid4
 
@@ -21,7 +21,7 @@ class WebSocketClient(QThread):
 
     async def connect(self):
         try:
-            self.websocket = await websockets.connect(
+            self.websocket = await websockets.connect(  # type: ignore
                 f"ws://{self.server_url}/ws/{self.uuid}/{getpass.getuser()}"
             )
             await self.listen()
