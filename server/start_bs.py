@@ -25,5 +25,5 @@ config_bluesky_logging()
 print("bluesky logging")
 
 if beamline == "fmx":
-    # gonio2 = Gonio2("XF:17IDC-ES:FMX{Gon:1-Ax", name="gonio2")
-    # light = YMotor('XF:17IDC-ES:FMX{Light:1', name='light')
+    from server.chip_scanner_plans import chip_scanner
+    # chip_scanner.load_fiducials()

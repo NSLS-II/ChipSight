@@ -3,7 +3,7 @@ from .manager import ConnectionManager
 from queue import Queue
 from model.comm_protocol import Protocol
 
-# from server import start_bs
+from server import start_bs
 
 
 class ChipScannerMessageManager:
@@ -73,6 +73,9 @@ class ChipScannerMessageManager:
         while not self.request_queue.empty():
             item = self.request_queue.get()
             print(f"Working on : {item}")
+            if len(item['address']) == 3:
+                print(f"Moving to {item['address']}")
+                start_bs.RE(start_bs.chip_scanner.drive_to_location(item['address']+'a'))
             print(f"Completed : {item}")
             await self.conn_manager.broadcast(
                 {

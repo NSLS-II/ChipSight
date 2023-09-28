@@ -157,6 +157,7 @@ class MainWindow(QMainWindow):
 
     def handle_server_message(self, message: str):
         data = json.loads(message)
+        print(f"Server Message: {data}")
         # Check if data is a broadcast
         if self.p.Key.BROADCAST in data:
             bcast_data = data[self.p.Key.BROADCAST]
@@ -180,7 +181,7 @@ class MainWindow(QMainWindow):
                     f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Key.STATUS_MSG]}"
                 )
         # Otherwise its unicast data
-        else:
+        elif self.p.Key.UNICAST in data:
             unicast_data = data[self.p.Key.UNICAST]
             if self.p.Key.LOGIN in unicast_data:
                 if unicast_data[self.p.Key.LOGIN] == self.p.Status.SUCCESS:
@@ -192,7 +193,7 @@ class MainWindow(QMainWindow):
                 self.status_window.append(
                     f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[self.p.Key.STATUS_MSG]}"
                 )
-        print(data)
+        
 
     def load_chip(self):
         dialog = LoadChipDialog(self)

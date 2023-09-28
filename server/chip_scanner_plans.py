@@ -18,9 +18,9 @@ from mxtools.zebra import Zebra
 from mxtools.flyer import MXFlyer
 from mxtools.eiger import EigerSingleTriggerV26, set_eiger_defaults
 from mxtools.handlers import EigerHandlerMX
-from start_bs import RE
+from server.start_bs import RE, db
 import datetime
-from devices import cam_7, cam_8, shutter_bcu, trans_bcu, trans_ri
+from server.devices import cam_7, cam_8, shutter_bcu, trans_bcu, trans_ri
 
 db.reg.register_handler(EigerHandlerMX.spec, EigerHandlerMX)
 
