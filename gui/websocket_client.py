@@ -6,22 +6,23 @@ from PyQt5.QtCore import QObject
 import websockets
 from qtpy.QtCore import QThread, Signal
 from fastapi.exceptions import WebSocketRequestValidationError
+from uuid import uuid4
 
 
 class WebSocketClient(QThread):
     message_received = Signal(str)
 
     def __init__(
-        self, parent: QObject | None = None, server_url="localhost", server_port=8000
+        self, parent: QObject | None = None, server_url="localhost:8000"
     ) -> None:
         super().__init__(parent)
         self.server_url = server_url
-        self.server_port = server_port
+        self.uuid = uuid4()
 
     async def connect(self):
         try:
             self.websocket = await websockets.connect(
-                f"ws://{self.server_url}:{self.server_port}/ws/{os.getpid()}/{getpass.getuser()}"
+                f"ws://{self.server_url}/ws/{self.uuid}/{getpass.getuser()}"
             )
             await self.listen()
         except ConnectionRefusedError:

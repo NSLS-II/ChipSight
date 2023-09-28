@@ -69,7 +69,7 @@ class BasePlugin:
         Returns a list of actions to be added to the context menu.
 
         Returns:
-            List of QActions
+            List of QAction
         """
         return []
 

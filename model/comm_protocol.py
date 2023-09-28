@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class Labels:
+class Key:
     ACTION = "action"
     METADATA = "metadata"
     USER = "user"
@@ -10,12 +10,14 @@ class Labels:
     STATUS = "status"
     STATUS_MSG = "status_message"
     BROADCAST = "broadcast"
+    UNICAST = "unicast"
     ADDRESS = "address"
     MOVE_GONIO = "move_gonio"
+    LOGIN = "login"
 
 
 @dataclass(frozen=True)
-class Actions:
+class Action:
     ADD_TO_QUEUE = "add_to_queue"
     COLLECT_QUEUE = "collect_queue"
     CLEAR_QUEUE = "clear_queue"
@@ -30,6 +32,6 @@ class Status:
 
 @dataclass(frozen=True)
 class Protocol:
-    Actions = Actions
+    Action = Action
     Status = Status
-    Labels = Labels
+    Key = Key

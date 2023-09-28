@@ -1,14 +1,11 @@
 import re
 import json
 from typing import Dict, Any
-from PyQt5 import QtGui
 from qtpy.QtWidgets import (
-    QApplication,
     QMainWindow,
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGridLayout,
     QPushButton,
     QLabel,
     QLineEdit,
@@ -17,7 +14,7 @@ from qtpy.QtWidgets import (
 from datetime import datetime
 from qtpy import QtCore
 from model.chip import Chip
-from gui.dialogs import LoadChipDialog
+from gui.dialogs import LoadChipDialog, LoginDialog
 from gui.collection_queue import CollectionQueueWidget
 from gui.chip_widgets import ChipGridWidget, BlockGridWidget
 from gui.websocket_client import WebSocketClient
@@ -34,10 +31,9 @@ class MainWindow(QMainWindow):
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.chip = chip
         self.config = config
+        self.server_url = f'{config["server"]["url"]}:{config["server"]["port"]}'
 
-        self.websocket_client = WebSocketClient(
-            server_url=config["server"]["url"], server_port=config["server"]["port"]
-        )
+        self.websocket_client = WebSocketClient(server_url=self.server_url)
         self.websocket_client.message_received.connect(self.handle_server_message)
         self.websocket_client.start()
 
@@ -90,7 +86,7 @@ class MainWindow(QMainWindow):
         right_layout = QVBoxLayout()
         main_layout.addLayout(right_layout)
 
-        #Setup Q microscope
+        # Setup Q microscope
         self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin])
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
@@ -136,8 +132,15 @@ class MainWindow(QMainWindow):
         # Setup protocol
         self.p = Protocol()
 
-        
+        self.show_login_modal()
+
         self.update()
+
+    def show_login_modal(self):
+        self.login_modal = LoginDialog(
+            server_url=f"http://{self.server_url}/gui_login/{self.websocket_client.uuid}",
+            uuid=self.websocket_client.uuid,
+        )
 
     def clean_up(self):
         self.microscope.acquire(False)
@@ -145,7 +148,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         self.clean_up()
         event.accept()
-        
 
     def set_last_selected(self, value: "tuple[int, int]"):
         self.last_selected = value
@@ -155,22 +157,40 @@ class MainWindow(QMainWindow):
 
     def handle_server_message(self, message: str):
         data = json.loads(message)
-        if self.p.Labels.BROADCAST in data:
-            bcast_data = data[self.p.Labels.BROADCAST]
-            if self.p.Labels.ACTION in bcast_data:
-                action = bcast_data[self.p.Labels.ACTION]
-                metadata = bcast_data[self.p.Labels.METADATA]
-                if action == self.p.Actions.ADD_TO_QUEUE:
-                    req = metadata[self.p.Labels.REQUEST]
+        # Check if data is a broadcast
+        if self.p.Key.BROADCAST in data:
+            bcast_data = data[self.p.Key.BROADCAST]
+            # Check if broadcast contains an action
+            if self.p.Key.ACTION in bcast_data:
+                # Get the action and related metadata
+                action = bcast_data[self.p.Key.ACTION]
+                metadata = bcast_data[self.p.Key.METADATA]
+                # Add to queue
+                if action == self.p.Action.ADD_TO_QUEUE:
+                    req = metadata[self.p.Key.REQUEST]
                     self.collection_queue.collection_queue.add_to_queue(
-                        req[self.p.Labels.ADDRESS]
+                        req[self.p.Key.ADDRESS]
                     )
-                if action == self.p.Actions.CLEAR_QUEUE:
+                # Clear queue
+                if action == self.p.Action.CLEAR_QUEUE:
                     self.collection_queue.collection_queue.queue = []
-
-            if self.p.Labels.STATUS_MSG in bcast_data:
+            # Check if broadcast contains a status message
+            if self.p.Key.STATUS_MSG in bcast_data:
                 self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Labels.STATUS_MSG]}"
+                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Key.STATUS_MSG]}"
+                )
+        # Otherwise its unicast data
+        else:
+            unicast_data = data[self.p.Key.UNICAST]
+            if self.p.Key.LOGIN in unicast_data:
+                if unicast_data[self.p.Key.LOGIN] == self.p.Status.SUCCESS:
+                    self.login_modal.programmatic_close = True
+                    self.login_modal.close()
+
+            # Check if broadcast contains a status message
+            if self.p.Key.STATUS_MSG in unicast_data:
+                self.status_window.append(
+                    f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[self.p.Key.STATUS_MSG]}"
                 )
         print(data)
 
