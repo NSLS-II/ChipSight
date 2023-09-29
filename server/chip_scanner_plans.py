@@ -251,6 +251,12 @@ class ChipScanner(Device):
         
         setattr(self, location, np.array([x_loc, y_loc, z_loc]))
         setattr(self, location + "_enc", np.array([x_loc_enc, y_loc_enc, z_loc_enc]))
+
+    def move_gonio_to(self, x, y):
+        yield from bps.mv(self.x, x, self.y, y)
+    
+    def nudge_gonio_by(self, x, y):
+        yield from bps.mv(self.x, self.x.get().user_readback+x, self.y, self.y.get().user_readback+y)
     
     def find_fiducials(self):
         """Routine to find the fiducials of the chip, based on an 

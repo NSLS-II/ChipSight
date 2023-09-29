@@ -23,6 +23,8 @@ class Action:
     COLLECT_QUEUE = "collect_queue"
     CLEAR_QUEUE = "clear_queue"
     MOVE_GONIO = "move_gonio"
+    NUDGE_GONIO = "nudge_gonio"
+    SET_FIDUCIAL = "set_fiducial"
 
 
 @dataclass(frozen=True)

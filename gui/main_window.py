@@ -6,10 +6,12 @@ from qtpy.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
+    QGridLayout,
     QPushButton,
     QLabel,
     QLineEdit,
     QTextEdit,
+    QToolButton
 )
 from datetime import datetime
 from qtpy import QtCore
@@ -22,6 +24,9 @@ from model.comm_protocol import Protocol
 
 from gui.microscope.microscope import Microscope
 from gui.microscope.plugins.c2c_plugin import C2CPlugin
+from gui.microscope.plugins.crosshair_plugin import CrossHairPlugin
+
+from gui.utils import send_message_to_server
 
 
 class MainWindow(QMainWindow):
@@ -77,13 +82,66 @@ class MainWindow(QMainWindow):
             param_layout.addWidget(param_field)
             left_layout.addLayout(param_layout)
             param_info["widget"] = param_field
+        
+        # F0 to F2 buttons
+        fidu_buttons = QGridLayout()
+
+        F0_button = QPushButton('F0')
+        F0_button.clicked.connect(self.go_to_F0)
+        set_F0_button = QPushButton('Set F0')
+        set_F0_button.clicked.connect(self.set_F0)
+
+
+        F1_button = QPushButton('F1')
+        F1_button.clicked.connect(self.go_to_F1)
+        set_F1_button = QPushButton('Set F1')
+        set_F1_button.clicked.connect(self.set_F1)
+
+        F2_button = QPushButton('F2')
+        F2_button.clicked.connect(self.go_to_F2)
+        set_F2_button = QPushButton('Set F2')
+        set_F2_button.clicked.connect(self.set_F2)
+
+
+        fidu_buttons.addWidget(F0_button, 0, 0)
+        fidu_buttons.addWidget(set_F0_button, 0, 1)
+        fidu_buttons.addWidget(F1_button, 1, 0)
+        fidu_buttons.addWidget(set_F1_button, 1, 1)
+        fidu_buttons.addWidget(F2_button, 2, 0)
+        fidu_buttons.addWidget(set_F2_button, 2, 1)
+        left_layout.addLayout(fidu_buttons)
+
+        nudge_buttons = QHBoxLayout()
+        self.nudge_amount = QLineEdit("10")
+
+        up_button = QToolButton()
+        up_button.setArrowType(QtCore.Qt.UpArrow)
+        up_button.clicked.connect(self.nudge_up)
+        down_button = QToolButton()
+        down_button.setArrowType(QtCore.Qt.DownArrow)
+        down_button.clicked.connect(self.nudge_down)
+
+        left_button = QToolButton()
+        left_button.setArrowType(QtCore.Qt.LeftArrow)
+        left_button.clicked.connect(self.nudge_left)
+
+        right_button = QToolButton()
+        right_button.setArrowType(QtCore.Qt.RightArrow)
+        right_button.clicked.connect(self.nudge_right)
+
+        nudge_buttons.addWidget(self.nudge_amount)
+        nudge_buttons.addWidget(up_button)
+        nudge_buttons.addWidget(down_button)
+        nudge_buttons.addWidget(left_button)
+        nudge_buttons.addWidget(right_button)
+        left_layout.addLayout(nudge_buttons)
 
         # Right Layout (Block Label and Block Grid)
         right_layout = QVBoxLayout()
         main_layout.addLayout(right_layout)
 
         # Setup Q microscope
-        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin])  # type: ignore
+        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin, CrossHairPlugin])  # type: ignore
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
         self.microscope.url = self.config["sample_cam"]["url"]
@@ -131,6 +189,46 @@ class MainWindow(QMainWindow):
         self.show_login_modal()
 
         self.update()
+
+    def go_to_F0(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":-25400/2, "y":-25400/2}})
+
+    def go_to_F1(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":25400/2, "y":-25400/2}})
+    
+    def go_to_F2(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":-25400/2, "y":25400/2}})
+
+    def nudge_up(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":0, "y":int(self.nudge_amount.text())}})
+    
+    def nudge_down(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":0, "y":-int(self.nudge_amount.text())}})
+    
+    def nudge_left(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":-int(self.nudge_amount.text()), "y":0}})
+    
+    def nudge_right(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
+                                                       self.p.Key.METADATA: {"x":int(self.nudge_amount.text()), "y":0}})
+
+    def set_F0(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
+                                                       self.p.Key.METADATA: {"fiducial_name": "F0"}})
+    
+    def set_F1(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
+                                                       self.p.Key.METADATA: {"fiducial_name": "F1"}})
+        
+    def set_F2(self):
+        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
+                                                       self.p.Key.METADATA: {"fiducial_name": "F2"}})
 
     def show_login_modal(self):
         self.login_modal = LoginDialog(
