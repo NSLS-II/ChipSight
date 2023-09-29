@@ -21,8 +21,12 @@ class ChipScannerMessageManager:
             await self.collect_queue(data, user_id)
         elif action == self.p.Action.CLEAR_QUEUE:
             await self.clear_queue(data, user_id)
-        elif action == self.p.Key.MOVE_GONIO:
+        elif action == self.p.Action.MOVE_GONIO:
             await self.move_gonio(data, user_id)
+        elif action == self.p.Action.NUDGE_GONIO:
+            await self.nudge_gonio(data, user_id)
+        elif action == self.p.Action.SET_FIDUCIAL:
+            await self.set_fiducial(data, user_id)
 
     """
     Other unimplemented commands:
@@ -31,6 +35,26 @@ class ChipScannerMessageManager:
      - Run immediately: E.g. click to center
     """
 
+    async def nudge_gonio(self, data: Dict[str, Any], user_id: str):
+        start_bs.RE(start_bs.chip_scanner.nudge_gonio_by(data[self.p.Key.METADATA]["x"], data[self.p.Key.METADATA]["y"]))
+        await self.conn_manager.broadcast(
+            {
+                self.p.Key.STATUS_MSG: f"{user_id} moved gonio by {data[self.p.Key.METADATA]}",
+                self.p.Key.STATUS: self.p.Status.SUCCESS,
+            }
+        )
+
+    async def set_fiducial(self, data: Dict[str, Any], user_id: str):
+        start_bs.chip_scanner.manual_set_fiducial(data[self.p.Key.METADATA]["fiducial_name"])
+        x_pos = start_bs.chip_scanner.x.get().user_readback
+        y_pos = start_bs.chip_scanner.y.get().user_readback
+        await self.conn_manager.broadcast(
+            {
+                self.p.Key.STATUS_MSG: f"{user_id} set fiducial {data[self.p.Key.METADATA]}: ({x_pos}, {y_pos})",
+                self.p.Key.STATUS: self.p.Status.SUCCESS,
+            }
+        )
+
     async def move_gonio(self, data: Dict[str, Any], user_id: str):
         """
         start_bs.gonio2.move_gonio(data[self.p.Key.METADATA]["x"],
@@ -38,7 +62,7 @@ class ChipScannerMessageManager:
                                    data[self.p.Key.METADATA]["z"])
 
         """
-
+        start_bs.RE(start_bs.chip_scanner.move_gonio_to(data[self.p.Key.METADATA]["x"], data[self.p.Key.METADATA]["y"]))
         await self.conn_manager.broadcast(
             {
                 self.p.Key.STATUS_MSG: f"{user_id} moved gonio to {data[self.p.Key.METADATA]}",
