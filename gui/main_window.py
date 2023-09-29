@@ -46,10 +46,6 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
         main_layout.addLayout(left_layout)
 
-        self.load_chip_button = QPushButton("Load chip")
-        self.load_chip_button.clicked.connect(self.load_chip)
-        left_layout.addWidget(self.load_chip_button)
-
         # Chip Label
         self.chip_label = QLabel("Current chip: Chip01")
         left_layout.addWidget(self.chip_label)
@@ -193,73 +189,14 @@ class MainWindow(QMainWindow):
                 self.status_window.append(
                     f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[self.p.Key.STATUS_MSG]}"
                 )
-
-    def load_chip(self):
-        dialog = LoadChipDialog(self)
-        dialog.name_edit.setText(self.chip.name)
-        if dialog.exec():
-            new_name = dialog.name_edit.text().strip()
-            if self.valid_filename(new_name):
-                self.chip.change_name(new_name)
-                self.chip_label.setText(f"Current chip: {self.chip.name}")
-                for block_row in self.chip.blocks:
-                    for block in block_row:
-                        block.selected = False
-                        block.queued = "not queued"
-                        block.exposed = "not exposed"
-                        for row in block.rows:
-                            row.selected = False
-                            row.queued = "not queued"
-                            row.exposed = "not exposed"
-                self.update()
-            else:
-                self.status_window.append(
-                    "Invalid chip name. Please provide a valid name."
-                )
-
-    def valid_filename(self, new_name):
-        # Check that new_name is not None and doesn't start with a dot
-        if not new_name or new_name.startswith("."):
-            return False
-
-        # Check for invalid characters (Linux/UNIX and Windows)
-        # Linux/UNIX disallows null bytes and slashes in filenames, Windows disallows a number of special characters
-        invalid_chars = re.compile(r'[\x00/\x1F<>:"\\|?*]')
-
-        if invalid_chars.search(new_name):
-            return False
-
-        # Check for reserved filenames in Windows
-        reserved_names = [
-            "CON",
-            "PRN",
-            "AUX",
-            "NUL",
-            "COM1",
-            "COM2",
-            "COM3",
-            "COM4",
-            "COM5",
-            "COM6",
-            "COM7",
-            "COM8",
-            "COM9",
-            "LPT1",
-            "LPT2",
-            "LPT3",
-            "LPT4",
-            "LPT5",
-            "LPT6",
-            "LPT7",
-            "LPT8",
-            "LPT9",
-        ]
-
-        # Using case-insensitive match as Windows is case-insensitive
-        if new_name.upper() in reserved_names:
-            return False
-
-        return True
+        elif self.p.Key.ERROR in data:
+            self.status_window.append(
+                f"{datetime.now().strftime('%H:%M:%S')} : {data[self.p.Key.ERROR]}"
+            )
+        else:
+            self.status_window.append(
+                f"{datetime.now().strftime('%H:%M:%S')} : Unhandled message {data}"
+            )
 
     def update(self):
         # update chip label

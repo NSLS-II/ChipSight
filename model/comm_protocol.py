@@ -14,6 +14,7 @@ class Key:
     ADDRESS = "address"
     MOVE_GONIO = "move_gonio"
     LOGIN = "login"
+    ERROR = "error"
 
 
 @dataclass(frozen=True)
