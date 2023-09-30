@@ -6,27 +6,23 @@ from qtpy.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QGridLayout,
-    QPushButton,
     QLabel,
     QLineEdit,
     QTextEdit,
-    QToolButton
 )
 from datetime import datetime
 from qtpy import QtCore
 from model.chip import Chip
-from gui.dialogs import LoadChipDialog, LoginDialog
+from gui.dialogs import LoginDialog
 from gui.collection_queue import CollectionQueueWidget
 from gui.chip_widgets import ChipGridWidget, BlockGridWidget
+from gui.widgets import ControlPanelWidget
 from gui.websocket_client import WebSocketClient
 from model.comm_protocol import Protocol
 
 from gui.microscope.microscope import Microscope
 from gui.microscope.plugins.c2c_plugin import C2CPlugin
 from gui.microscope.plugins.crosshair_plugin import CrossHairPlugin
-
-from gui.utils import send_message_to_server
 
 
 class MainWindow(QMainWindow):
@@ -82,59 +78,12 @@ class MainWindow(QMainWindow):
             param_layout.addWidget(param_field)
             left_layout.addLayout(param_layout)
             param_info["widget"] = param_field
-        
+
         # F0 to F2 buttons
-        fidu_buttons = QGridLayout()
+        fidu_buttons = ControlPanelWidget(websocket_client=self.websocket_client)
+        left_layout.addWidget(fidu_buttons)
 
-        F0_button = QPushButton('F0')
-        F0_button.clicked.connect(self.go_to_F0)
-        set_F0_button = QPushButton('Set F0')
-        set_F0_button.clicked.connect(self.set_F0)
-
-
-        F1_button = QPushButton('F1')
-        F1_button.clicked.connect(self.go_to_F1)
-        set_F1_button = QPushButton('Set F1')
-        set_F1_button.clicked.connect(self.set_F1)
-
-        F2_button = QPushButton('F2')
-        F2_button.clicked.connect(self.go_to_F2)
-        set_F2_button = QPushButton('Set F2')
-        set_F2_button.clicked.connect(self.set_F2)
-
-
-        fidu_buttons.addWidget(F0_button, 0, 0)
-        fidu_buttons.addWidget(set_F0_button, 0, 1)
-        fidu_buttons.addWidget(F1_button, 1, 0)
-        fidu_buttons.addWidget(set_F1_button, 1, 1)
-        fidu_buttons.addWidget(F2_button, 2, 0)
-        fidu_buttons.addWidget(set_F2_button, 2, 1)
-        left_layout.addLayout(fidu_buttons)
-
-        nudge_buttons = QHBoxLayout()
-        self.nudge_amount = QLineEdit("10")
-
-        up_button = QToolButton()
-        up_button.setArrowType(QtCore.Qt.UpArrow)
-        up_button.clicked.connect(self.nudge_up)
-        down_button = QToolButton()
-        down_button.setArrowType(QtCore.Qt.DownArrow)
-        down_button.clicked.connect(self.nudge_down)
-
-        left_button = QToolButton()
-        left_button.setArrowType(QtCore.Qt.LeftArrow)
-        left_button.clicked.connect(self.nudge_left)
-
-        right_button = QToolButton()
-        right_button.setArrowType(QtCore.Qt.RightArrow)
-        right_button.clicked.connect(self.nudge_right)
-
-        nudge_buttons.addWidget(self.nudge_amount)
-        nudge_buttons.addWidget(up_button)
-        nudge_buttons.addWidget(down_button)
-        nudge_buttons.addWidget(left_button)
-        nudge_buttons.addWidget(right_button)
-        left_layout.addLayout(nudge_buttons)
+        # left_layout.addWidget(nudge_widget)
 
         # Right Layout (Block Label and Block Grid)
         right_layout = QVBoxLayout()
@@ -183,52 +132,10 @@ class MainWindow(QMainWindow):
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
-        # Setup protocol
-        self.p = Protocol()
-
-        self.show_login_modal()
+        if not self.config.get("test", False):
+            self.show_login_modal()
 
         self.update()
-
-    def go_to_F0(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":-25400/2, "y":-25400/2}})
-
-    def go_to_F1(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":25400/2, "y":-25400/2}})
-    
-    def go_to_F2(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.MOVE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":-25400/2, "y":25400/2}})
-
-    def nudge_up(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":0, "y":int(self.nudge_amount.text())}})
-    
-    def nudge_down(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":0, "y":-int(self.nudge_amount.text())}})
-    
-    def nudge_left(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":-int(self.nudge_amount.text()), "y":0}})
-    
-    def nudge_right(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.NUDGE_GONIO, 
-                                                       self.p.Key.METADATA: {"x":int(self.nudge_amount.text()), "y":0}})
-
-    def set_F0(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
-                                                       self.p.Key.METADATA: {"fiducial_name": "F0"}})
-    
-    def set_F1(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
-                                                       self.p.Key.METADATA: {"fiducial_name": "F1"}})
-        
-    def set_F2(self):
-        send_message_to_server(self.websocket_client, {self.p.Key.ACTION: self.p.Action.SET_FIDUCIAL,
-                                                       self.p.Key.METADATA: {"fiducial_name": "F2"}})
 
     def show_login_modal(self):
         self.login_modal = LoginDialog(
@@ -253,43 +160,43 @@ class MainWindow(QMainWindow):
         data = json.loads(message)
         print(f"Server Message: {data}")
         # Check if data is a broadcast
-        if self.p.Key.BROADCAST in data:
-            bcast_data = data[self.p.Key.BROADCAST]
+        if Protocol.Key.BROADCAST in data:
+            bcast_data = data[Protocol.Key.BROADCAST]
             # Check if broadcast contains an action
-            if self.p.Key.ACTION in bcast_data:
+            if Protocol.Key.ACTION in bcast_data:
                 # Get the action and related metadata
-                action = bcast_data[self.p.Key.ACTION]
-                metadata = bcast_data[self.p.Key.METADATA]
+                action = bcast_data[Protocol.Key.ACTION]
+                metadata = bcast_data[Protocol.Key.METADATA]
                 # Add to queue
-                if action == self.p.Action.ADD_TO_QUEUE:
-                    req = metadata[self.p.Key.REQUEST]
+                if action == Protocol.Action.ADD_TO_QUEUE:
+                    req = metadata[Protocol.Key.REQUEST]
                     self.collection_queue.collection_queue.add_to_queue(
-                        req[self.p.Key.ADDRESS]
+                        req[Protocol.Key.ADDRESS]
                     )
                 # Clear queue
-                if action == self.p.Action.CLEAR_QUEUE:
+                if action == Protocol.Action.CLEAR_QUEUE:
                     self.collection_queue.collection_queue.queue = []
             # Check if broadcast contains a status message
-            if self.p.Key.STATUS_MSG in bcast_data:
+            if Protocol.Key.STATUS_MSG in bcast_data:
                 self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[self.p.Key.STATUS_MSG]}"
+                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[Protocol.Key.STATUS_MSG]}"
                 )
         # Otherwise its unicast data
-        elif self.p.Key.UNICAST in data:
-            unicast_data = data[self.p.Key.UNICAST]
-            if self.p.Key.LOGIN in unicast_data:
-                if unicast_data[self.p.Key.LOGIN] == self.p.Status.SUCCESS:
+        elif Protocol.Key.UNICAST in data:
+            unicast_data = data[Protocol.Key.UNICAST]
+            if Protocol.Key.LOGIN in unicast_data:
+                if unicast_data[Protocol.Key.LOGIN] == Protocol.Status.SUCCESS:
                     self.login_modal.programmatic_close = True
                     self.login_modal.close()
 
             # Check if broadcast contains a status message
-            if self.p.Key.STATUS_MSG in unicast_data:
+            if Protocol.Key.STATUS_MSG in unicast_data:
                 self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[self.p.Key.STATUS_MSG]}"
+                    f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[Protocol.Key.STATUS_MSG]}"
                 )
-        elif self.p.Key.ERROR in data:
+        elif Protocol.Key.ERROR in data:
             self.status_window.append(
-                f"{datetime.now().strftime('%H:%M:%S')} : {data[self.p.Key.ERROR]}"
+                f"{datetime.now().strftime('%H:%M:%S')} : {data[Protocol.Key.ERROR]}"
             )
         else:
             self.status_window.append(

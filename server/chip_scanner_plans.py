@@ -180,12 +180,10 @@ def get_energy():
     Returns the current photon energy in eV derived from the DCM Bragg angle
     """ 
     
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    elif blStr == 'FMX':
+    if blStrGet() == 'FMX':
         energy = hdcm.e.user_readback.get()
-    
-    return energy
+        return energy
+    return -1
 
 class BeamlineCalibrations(Device):
     LoMagCal = Cpt(EpicsSignal, 'LoMagCal}')
@@ -206,7 +204,9 @@ class ChipScanner(Device):
                  APnum_x, APnum_y, APgap_x, APgap_y,
                  lo_camera, hi_camera, **kwargs):
         super().__init__(**kwargs)
-        
+        self.F0: "np.ndarray | None" = None 
+        self.F1: "np.ndarray | None" = None
+        self.F2: "np.ndarray | None" = None 
         self.F0_x = F0_x
         self.F0_y = F0_y
         self.F1_x = F1_x
@@ -252,11 +252,24 @@ class ChipScanner(Device):
         setattr(self, location, np.array([x_loc, y_loc, z_loc]))
         setattr(self, location + "_enc", np.array([x_loc_enc, y_loc_enc, z_loc_enc]))
 
-    def move_gonio_to(self, x, y):
-        yield from bps.mv(self.x, x, self.y, y)
+    def drive_to_position(self, x, y, z=None):
+        if not z:
+            yield from bps.mv(self.x, x, self.y, y)
+        else:
+            yield from bps.mv(self.x, x, self.y, y, self.z, z) 
     
-    def nudge_gonio_by(self, x, y):
-        yield from bps.mv(self.x, self.x.get().user_readback+x, self.y, self.y.get().user_readback+y)
+    def nudge_by(self, x, y):
+        self.drive_to_position(self.x.get().user_readback+x, self.y.get().user_readback+y)
+    
+    def drive_to_fiducial(self, location_name):
+        approx_locations = {'F0': (-self.F1_x/2, -self.F2_y/2), 
+                     'F1': (self.F1_x/2, -self.F2_y/2),
+                     'F2': (-self.F1_x/2, self.F2_y/2)}
+        location: "np.ndarray | None" = getattr(self, location_name)
+        if location is None:
+            self.drive_to_position(approx_locations[location_name][0], approx_locations[location_name][1])
+        else:
+            self.drive_to_position(location[0], location[1])
     
     def find_fiducials(self):
         """Routine to find the fiducials of the chip, based on an 
@@ -313,14 +326,15 @@ class ChipScanner(Device):
             print("At least two fiducial detections failed, check output for details.")
     
     def calculate_fit(self):
-        ab = self.F1 - self.F0
-        ac = self.F2 - self.F0
-        print(f"Distance between fiducial F0 and F1: {np.linalg.norm(ab):6.0f}um")
-        print(f"Distance between fiducial F0 and F2: {np.linalg.norm(ac):6.0f}um")
-        cos_theta = np.dot(ab, ac)/np.linalg.norm(ab)/np.linalg.norm(ac)
-        theta = np.arccos(np.clip(cos_theta, -1, 1))
-        print(f"Angle between vectors: {theta:6.4f}radians ({theta*180/np.pi:6.3f}deg)")
-        return(np.linalg.norm(ab), np.linalg.norm(ac), np.arccos(np.clip(cos_theta, -1, 1)))
+        if self.F0 and self.F1 and self.F2:
+            ab = self.F1 - self.F0
+            ac = self.F2 - self.F0
+            print(f"Distance between fiducial F0 and F1: {np.linalg.norm(ab):6.0f}um")
+            print(f"Distance between fiducial F0 and F2: {np.linalg.norm(ac):6.0f}um")
+            cos_theta = np.dot(ab, ac)/np.linalg.norm(ab)/np.linalg.norm(ac)
+            theta = np.arccos(np.clip(cos_theta, -1, 1))
+            print(f"Angle between vectors: {theta:6.4f}radians ({theta*180/np.pi:6.3f}deg)")
+            return(np.linalg.norm(ab), np.linalg.norm(ac), np.arccos(np.clip(cos_theta, -1, 1)))
     
     def get_fiducials(self):
         return self.F0, self.F1, self.F2, self.F0_enc, self.F1_enc, self.F2_enc
@@ -328,7 +342,8 @@ class ChipScanner(Device):
     def save_fiducials(self, filepath):
         with open(filepath, 'ab') as f:
             for arr in self.get_fiducials():
-                np.save(f, arr)
+                if arr:
+                    np.save(f, arr) 
                 
     def load_fiducials(self, filepath):
         to_load = ['F0', 'F1', 'F2', 'F0_enc', 'F1_enc', 'F2_enc']

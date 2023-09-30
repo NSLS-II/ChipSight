@@ -15,6 +15,13 @@ class Key:
     MOVE_GONIO = "move_gonio"
     LOGIN = "login"
     ERROR = "error"
+    NAME = "name"
+    X_POS = "x_position"
+    Y_POS = "y_position"
+    Z_POS = "z_position"
+    X_DELTA = "x_delta"
+    Y_DELTA = "y_delta"
+    Z_DELTA = "z_delta"
 
 
 @dataclass(frozen=True)
@@ -25,6 +32,7 @@ class Action:
     MOVE_GONIO = "move_gonio"
     NUDGE_GONIO = "nudge_gonio"
     SET_FIDUCIAL = "set_fiducial"
+    GO_TO_FIDUCIAL = "go_to_fiducial"
 
 
 @dataclass(frozen=True)
