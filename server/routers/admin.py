@@ -1,17 +1,15 @@
 from fastapi import Request, APIRouter, Depends
 from typing import Union, Any
 from fastapi.responses import HTMLResponse
-from server.dependencies import get_user_info, templates
+from server.dependencies import get_user_info, templates, proposal_id, date, pi, path
 from datetime import datetime
+from pathlib import Path
 
 router = APIRouter(
     prefix="/admin",
     tags=["admin"],
     responses={404: {"description": "Not found"}},
 )
-proposal_id = 999999
-date = datetime.now().strftime("%Y%m%d")
-pi = None
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -35,12 +33,13 @@ async def dashboard(
 
 @router.get("/visit", response_class=HTMLResponse)
 async def visit(request: Request):
-    global proposal_id, date, pi
+    global proposal_id, date, pi, path
     return f"""
     <div hx-target="this" hx-swap="outerHTML">
     <div><label>Proposal</label>: { proposal_id } </div>
     <div><label>Date</label>: { date }</div>
     <div><label>PI</label>: { pi }</div>
+    <div><label>Data path</label>: { str(path) }</div>
     <button hx-get="admin/visit/edit" class="btn btn-primary">
         Click To Edit
     </button>
@@ -51,11 +50,18 @@ async def visit(request: Request):
 @router.put("/visit", response_class=HTMLResponse)
 async def put_visit(request: Request):
     data = await request.form()
-    global proposal_id, date, pi
+    global proposal_id, date, pi, path
     proposal_id = data["proposal"]
     date = data["date"]
     pi = data["pi"]
-    return """<div>Proposal changed successfully</div>"""
+    print(data)
+    base_path = Path("/nsls2/data/fmx/proposals/")
+    data_path = Path(f"pass-{proposal_id}") / Path(f"{proposal_id}-{date}-{pi}")
+    if "commissioning" in data:
+        path = base_path / Path("commissioning") / data_path
+    else:
+        path = base_path / data_path
+    return f"""<div>Proposal changed successfully to {path} </div>"""
 
 
 @router.get("/visit/edit", response_class=HTMLResponse)
@@ -74,6 +80,10 @@ async def edit_visit():
     <div class="form-group">
         <label>PI</label>
         <input type="text" name="pi" value="{pi}">
+    </div>
+    <div class="form-group">
+        <input type="checkbox" id="commissioning" name="commissioning" />
+        <label>Commissioning</label>
     </div>
     <button class="btn">Submit</button>
     <button class="btn" hx-get="admin/visit">Cancel</button>
