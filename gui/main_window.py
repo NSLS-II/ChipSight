@@ -139,7 +139,7 @@ class MainWindow(QMainWindow):
 
     def show_login_modal(self):
         self.login_modal = LoginDialog(
-            server_url=f"http://{self.server_url}/gui_login/{self.websocket_client.uuid}",
+            server_url=f"http://{self.server_url}/gui/login/{self.websocket_client.uuid}",
             uuid=self.websocket_client.uuid,
         )
 

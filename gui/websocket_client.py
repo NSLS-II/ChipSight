@@ -22,7 +22,7 @@ class WebSocketClient(QThread):
     async def connect(self):
         try:
             self.websocket = await websockets.connect(  # type: ignore
-                f"ws://{self.server_url}/ws/{self.uuid}/{getpass.getuser()}"
+                f"ws://{self.server_url}/gui/ws/{self.uuid}/{getpass.getuser()}"
             )
             await self.listen()
         except ConnectionRefusedError:
