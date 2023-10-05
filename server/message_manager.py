@@ -72,7 +72,7 @@ class ChipScannerMessageManager:
 
     async def set_fiducial(self, data: Dict[str, Any], user_id: str):
         start_bs.chip_scanner.manual_set_fiducial(
-            data[Protocol.Key.METADATA]["fiducial_name"]
+            data[Protocol.Key.METADATA]["name"]
         )
         x_pos = start_bs.chip_scanner.x.get().user_readback
         y_pos = start_bs.chip_scanner.y.get().user_readback

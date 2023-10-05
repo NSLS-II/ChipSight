@@ -259,7 +259,7 @@ class ChipScanner(Device):
             yield from bps.mv(self.x, x, self.y, y, self.z, z) 
     
     def nudge_by(self, x, y):
-        self.drive_to_position(self.x.get().user_readback+x, self.y.get().user_readback+y)
+        yield from self.drive_to_position(self.x.get().user_readback+x, self.y.get().user_readback+y)
     
     def drive_to_fiducial(self, location_name):
         approx_locations = {'F0': (-self.F1_x/2, -self.F2_y/2), 
@@ -267,9 +267,9 @@ class ChipScanner(Device):
                      'F2': (-self.F1_x/2, self.F2_y/2)}
         location: "np.ndarray | None" = getattr(self, location_name)
         if location is None:
-            self.drive_to_position(approx_locations[location_name][0], approx_locations[location_name][1])
+            yield from self.drive_to_position(approx_locations[location_name][0], approx_locations[location_name][1])
         else:
-            self.drive_to_position(location[0], location[1])
+            yield from self.drive_to_position(location[0], location[1])
     
     def find_fiducials(self):
         """Routine to find the fiducials of the chip, based on an 
