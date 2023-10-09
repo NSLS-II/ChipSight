@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 # =============================================================================
-# Section 1: Message Types
+# Section 1: Metadata
 # =============================================================================
 
 
@@ -95,6 +95,10 @@ MetadataType = Union[
     ExecuteActionResponse,
     LoginResponse,
 ]
+
+# =============================================================================
+# Section 2: Payload
+# =============================================================================
 
 
 class Payload(BaseModel):
@@ -233,6 +237,10 @@ PayloadType = Union[
     CollectQueue,
     RemoveFromQueue,
 ]
+
+# =============================================================================
+# Section 3: Message
+# =============================================================================
 
 
 class Message(BaseModel):
