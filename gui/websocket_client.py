@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import websockets
 from fastapi.exceptions import WebSocketRequestValidationError
-from pydantic import parse_obj_as
+from pydantic import parse_raw_as
 from PyQt5.QtCore import QObject
 from qtpy.QtCore import QThread, Signal  # type: ignore
 
@@ -37,7 +37,7 @@ class WebSocketClient(QThread):
     async def listen(self):
         while True:
             message = await self.websocket.recv()
-            message = parse_obj_as(Message, message)
+            message = parse_raw_as(Message, message)
             self.message_received.emit(message)
 
     async def send(self, message):

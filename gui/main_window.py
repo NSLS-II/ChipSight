@@ -29,6 +29,7 @@ from model.comm_protocol import (
     PayloadType,
     QueueActionResponse,
     RemoveFromQueue,
+    StatusResponse,
 )
 
 
@@ -164,7 +165,6 @@ class MainWindow(QMainWindow):
         self.update()
 
     def handle_server_response(self, message: Message):
-        print("Message Type not implemented")
         if isinstance(message.metadata, QueueActionResponse):
             self.handle_queue_action(message.metadata, message.payload)
         elif isinstance(message.metadata, ErrorResponse):
@@ -173,6 +173,10 @@ class MainWindow(QMainWindow):
                 f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
             )
             self.status_window.setTextColor(QtCore.Qt.GlobalColor.black)
+        elif isinstance(message.metadata, StatusResponse):
+            self.status_window.append(
+                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
+            )
         else:
             self.status_window.append(
                 f"{message.metadata.timestamp.strftime('%H:%M:%S')} : Unhandled response - {message.metadata.__class__.__name__}"

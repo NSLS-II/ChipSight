@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # =============================================================================
 # Section 1: Metadata
@@ -25,7 +25,7 @@ class Metadata(BaseModel):
     """
 
     user_id: Optional[str] = None
-    timestamp: datetime = datetime.now()
+    timestamp: datetime = Field(default_factory=datetime.now)
     message_type: str
 
 
@@ -87,6 +87,11 @@ class LoginResponse(Metadata):
     login_success: bool
 
 
+class StatusResponse(Metadata):
+    message_type: Literal["status"] = "status"
+    status_msg: str = ""
+
+
 MetadataType = Union[
     QueueRequest,
     ExecuteRequest,
@@ -94,6 +99,7 @@ MetadataType = Union[
     ErrorResponse,
     ExecuteActionResponse,
     LoginResponse,
+    StatusResponse,
 ]
 
 # =============================================================================

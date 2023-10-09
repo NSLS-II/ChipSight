@@ -27,8 +27,8 @@ class ConnectionManager:
     async def unicast(self, message: Message, client_id: UUID):
         websocket = self.active_connections.get(client_id, None)
         if websocket:
-            await websocket.send_json(message.dict())
+            await websocket.send_text(message.json())
 
     async def broadcast(self, message: Message):
         for client_id, connection in self.active_connections.items():
-            await connection.send_json(message.dict())
+            await connection.send_text(message.json())
