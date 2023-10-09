@@ -1,8 +1,12 @@
-from typing import Dict, Any
-from qtpy.QtWidgets import QWidget
-from .websocket_client import WebSocketClient
 import asyncio
-import json
+import getpass
+from uuid import UUID
+
+from qtpy.QtWidgets import QWidget
+
+from model.comm_protocol import ExecuteRequest, Message, PayloadType, QueueRequest
+
+from .websocket_client import WebSocketClient
 
 
 def update_button_style(
@@ -56,8 +60,22 @@ def update_button_style(
     return button
 
 
-def send_message_to_server(client: WebSocketClient, data: Dict[str, Any]):
+def send_message_to_server(client: WebSocketClient, message: Message):
     asyncio.run_coroutine_threadsafe(
-        client.send(json.dumps(data)),
+        client.send(message.json()),
         client.loop,
+    )
+
+
+def create_execute_action_request(payload: PayloadType, client_id: UUID) -> Message:
+    return Message(
+        metadata=ExecuteRequest(user_id=getpass.getuser(), client_id=client_id),
+        payload=payload,
+    )
+
+
+def create_add_to_queue_request(payload: PayloadType, client_id: UUID) -> Message:
+    return Message(
+        metadata=QueueRequest(user_id=getpass.getuser(), client_id=client_id),
+        payload=payload,
     )

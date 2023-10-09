@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from server.routers import gui, base, authentication, admin
 
+from server.routers import admin, authentication, base, gui
 
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key="some-key", max_age=24 * 3600)

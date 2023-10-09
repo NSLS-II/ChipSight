@@ -1,13 +1,10 @@
-from qtpy import QtCore
-from qtpy.QtWidgets import (
-    QWidget,
-    QGridLayout,
-    QToolButton,
-    QSpinBox,
-)
-from gui.utils import send_message_to_server
-from model.comm_protocol import Protocol
 import typing
+
+from qtpy import QtCore
+from qtpy.QtWidgets import QGridLayout, QSpinBox, QToolButton, QWidget
+
+from gui.utils import create_execute_action_request, send_message_to_server
+from model.comm_protocol import NudgeGonio
 
 if typing.TYPE_CHECKING:
     from gui.websocket_client import WebSocketClient
@@ -63,13 +60,11 @@ class NudgeWidget(QWidget):
         }
 
         delta = delta_values.get(direction, (0, 0))
+
         send_message_to_server(
             self.websocket_client,
-            {
-                Protocol.Key.ACTION: Protocol.Action.NUDGE_GONIO,
-                Protocol.Key.METADATA: {
-                    Protocol.Key.X_DELTA: delta[0],
-                    Protocol.Key.Y_DELTA: delta[1],
-                },
-            },
+            create_execute_action_request(
+                NudgeGonio(x_delta=delta[0], y_delta=delta[1], z_delta=0),
+                client_id=self.websocket_client.uuid,
+            ),
         )

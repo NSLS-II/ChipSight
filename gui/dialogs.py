@@ -1,14 +1,14 @@
-from qtpy.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QPushButton,
-    QLineEdit,
-    QLabel,
-    QHBoxLayout,
-    QApplication,
-)
+from qtpy.QtCore import QUrl
 from qtpy.QtGui import QDesktopServices
-from qtpy.QtCore import QUrl, Qt
+from qtpy.QtWidgets import (
+    QApplication,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+)
 
 
 class LoadChipDialog(QDialog):

@@ -1,118 +1,169 @@
-from typing import Dict, Any, Callable
-from .manager import ConnectionManager
 from queue import Queue
-from model.comm_protocol import Protocol
+from typing import Any, Callable, Dict, Optional, Type, TypeVar
+from uuid import UUID
 
+from model.comm_protocol import (
+    ClearQueue,
+    CollectNeighborhood,
+    CollectQueue,
+    CollectRow,
+    ErrorResponse,
+    ExecuteActionResponse,
+    ExecuteRequest,
+    GoToFiducial,
+    LoginResponse,
+    Message,
+    MetadataType,
+    MoveGonio,
+    NudgeGonio,
+    PayloadType,
+    QueueActionResponse,
+    QueueRequest,
+    SetFiducial,
+)
 from server import start_bs
+
+from .manager import ConnectionManager
+
+T = TypeVar("T", bound=PayloadType)
 
 
 class ChipScannerMessageManager:
     def __init__(self, connection_manager: ConnectionManager):
         self.name = "Chip scanner manager"
         self.conn_manager = connection_manager
-        self.request_queue = Queue()
-
-    async def process_message(self, data: Dict[str, Any], user_id: str):
-        action = data[Protocol.Key.ACTION]
-        action_methods: Dict[str, Callable] = {
-            Protocol.Action.ADD_TO_QUEUE: self.add_to_queue,
-            Protocol.Action.COLLECT_QUEUE: self.collect_queue,
-            Protocol.Action.CLEAR_QUEUE: self.clear_queue,
-            Protocol.Action.MOVE_GONIO: self.move_gonio,
-            Protocol.Action.NUDGE_GONIO: self.nudge_gonio,
-            Protocol.Action.SET_FIDUCIAL: self.set_fiducial,
-            Protocol.Action.GO_TO_FIDUCIAL: self.go_to_fiducial,
+        self.request_queue: Queue[PayloadType] = Queue()
+        self.valid_queue_requests: Dict[Type[PayloadType], Callable] = {
+            CollectNeighborhood: self.collect_neighborhood,
+            CollectRow: self.collect_row,
         }
-        # If co-routines become complicated or need more than just data and user_id
-        # consider using match statements for python>=3.10
-        method = action_methods.get(action, self.unrecognized_action)
-        await method(data, user_id)
+        self.valid_immediate_requests: Dict[Type[PayloadType], Callable] = {
+            GoToFiducial: self.go_to_fiducial,
+            ClearQueue: self.clear_queue,
+        }
+
+    async def process_message(self, data: Message, user_id: str):
+        if isinstance(data.metadata, QueueRequest):
+            await self.handle_queue_request(data.metadata, data.payload)
+        elif isinstance(data.metadata, ExecuteRequest):
+            await self.handle_execute_request(data.metadata, data.payload)
+
+    async def handle_queue_request(
+        self, metadata: QueueRequest, payload: Optional[PayloadType]
+    ):
+        if payload and type(payload) in self.valid_queue_requests:
+            self.request_queue.put(payload)
+            await self.conn_manager.broadcast(
+                Message(
+                    metadata=QueueActionResponse(
+                        status_msg=f"{metadata.user_id} added request {str(payload)} to queue",
+                        user_id=metadata.user_id,
+                    ),
+                    payload=payload,
+                )
+            )
+        else:
+            await self.conn_manager.unicast(
+                Message(
+                    metadata=ErrorResponse(
+                        user_id=None,
+                        status_msg="Could not find request in list of valid requests",
+                    ),
+                    payload=None,
+                ),
+                client_id=metadata.client_id,
+            )
 
     """
     Other unimplemented commands:
      - Pause queue: Should complete current task and pause
      - Stop queue: Stop current task immediately 
-     - Run immediately: E.g. click to center
-    """
+     """
 
-    async def unrecognized_action(self, data, user_id):
+    async def handle_execute_request(
+        self, metadata: ExecuteRequest, payload: Optional[PayloadType]
+    ):
+        if payload and type(payload) in self.valid_immediate_requests:
+            run_engine_state = start_bs.RE.state
+            if run_engine_state == "idle":
+                self.valid_immediate_requests[type(payload)](
+                    ExecuteActionResponse(), payload
+                )
+            elif run_engine_state == "running":
+                await self.conn_manager.unicast(
+                    Message(
+                        metadata=ErrorResponse(
+                            status_msg="Run engine is busy, cannot fulfill request"
+                        )
+                    ),
+                    client_id=metadata.client_id,
+                )
+            elif run_engine_state == "paused":
+                await self.conn_manager.unicast(
+                    Message(
+                        metadata=ErrorResponse(
+                            status_msg="Run engine is paused, cannot fulfill request"
+                        )
+                    ),
+                    client_id=metadata.client_id,
+                )
+
+    async def go_to_fiducial(
+        self, response_metadata: MetadataType, payload: GoToFiducial
+    ):
+        start_bs.RE(start_bs.chip_scanner.drive_to_fiducial(payload.name))
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} sent unrecognized action {data}",
-                Protocol.Key.STATUS: Protocol.Status.FAILURE,
-            }
+            Message(metadata=response_metadata, payload=payload)
         )
 
-    async def go_to_fiducial(self, data, user_id):
-        start_bs.RE(
-            start_bs.chip_scanner.drive_to_fiducial(
-                data[Protocol.Key.METADATA][Protocol.Key.NAME]
-            )
-        )
-        await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} moved to fiducial {data[Protocol.Key.METADATA]}",
-                Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-            }
-        )
-
-    async def nudge_gonio(self, data: Dict[str, Any], user_id: str):
+    async def nudge_gonio(self, response_metadata: MetadataType, payload: NudgeGonio):
         start_bs.RE(
             start_bs.chip_scanner.nudge_by(
-                data[Protocol.Key.METADATA][Protocol.Key.X_DELTA],
-                data[Protocol.Key.METADATA][Protocol.Key.Y_DELTA],
+                payload.x_delta,
+                payload.y_delta,
             )
         )
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} moved gonio by {data[Protocol.Key.METADATA]}",
-                Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-            }
+            Message(metadata=response_metadata, payload=payload)
         )
 
-    async def set_fiducial(self, data: Dict[str, Any], user_id: str):
-        start_bs.chip_scanner.manual_set_fiducial(
-            data[Protocol.Key.METADATA]["name"]
-        )
-        x_pos = start_bs.chip_scanner.x.get().user_readback
-        y_pos = start_bs.chip_scanner.y.get().user_readback
+    async def set_fiducial(self, response_metadata: MetadataType, payload: SetFiducial):
+        start_bs.chip_scanner.manual_set_fiducial(payload.name)
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} set fiducial {data[Protocol.Key.METADATA]}: ({x_pos}, {y_pos})",
-                Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-            }
+            Message(metadata=response_metadata, payload=payload)
         )
 
-    async def move_gonio(self, data: Dict[str, Any], user_id: str):
+    async def move_gonio(self, response_metadata: MetadataType, payload: MoveGonio):
         start_bs.RE(
             start_bs.chip_scanner.drive_to_position(
-                data[Protocol.Key.METADATA][Protocol.Key.X_POS],
-                data[Protocol.Key.METADATA][Protocol.Key.Y_POS],
+                payload.x_pos,
+                payload.y_pos,
             )
         )
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} moved gonio to {data[Protocol.Key.METADATA]}",
-                Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-            }
+            Message(metadata=response_metadata, payload=payload)
         )
 
-    async def add_to_queue(self, data: Dict[str, Any], user_id: str):
-        """
-        Adds request to queue, then broadcasts to all clients that a request has been added
-        """
-
-        self.request_queue.put(data[Protocol.Key.METADATA])
+    async def collect_neighborhood(
+        self, response_metadata: MetadataType, payload: CollectNeighborhood
+    ):
+        start_bs.RE(
+            start_bs.chip_scanner.ppmac_neighbourhood_scan(
+                payload.location, payload.wait_time
+            )
+        )
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.ACTION: Protocol.Action.ADD_TO_QUEUE,
-                Protocol.Key.METADATA: {
-                    Protocol.Key.USER: user_id,
-                    Protocol.Key.REQUEST: data[Protocol.Key.METADATA],
-                },
-                Protocol.Key.STATUS_MSG: f"{user_id} added request {data[Protocol.Key.METADATA]}",
-                Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-            }
+            Message(metadata=response_metadata, payload=payload)
+        )
+
+    async def collect_row(self, response_metadata: MetadataType, payload: CollectRow):
+        start_bs.RE(
+            start_bs.chip_scanner.ppmac_single_line_scan(
+                payload.location, payload.wait_time
+            )
+        )
+        await self.conn_manager.broadcast(
+            Message(metadata=response_metadata, payload=payload)
         )
 
     async def collect_queue(self, data: Dict[str, Any], user_id: str):
@@ -122,18 +173,18 @@ class ChipScannerMessageManager:
         while not self.request_queue.empty():
             item = self.request_queue.get()
             print(f"Working on : {item}")
-            if len(item["address"]) == 3:
-                print(f"Moving to {item['address']}")
-                start_bs.RE(
-                    start_bs.chip_scanner.drive_to_location(item["address"] + "a")
-                )
-            print(f"Completed : {item}")
             await self.conn_manager.broadcast(
-                {
-                    Protocol.Key.STATUS_MSG: f"Collecting request {item}",
-                    Protocol.Key.STATUS: Protocol.Status.SUCCESS,
-                }
+                Message(
+                    metadata=QueueActionResponse(
+                        status_msg=f"Collecting request {item}"
+                    )
+                )
             )
+            response = QueueActionResponse()
+            self.valid_queue_requests[type(item)](response, item)
+
+            print(f"Completed : {item}")
+
             self.request_queue.task_done()
 
     async def clear_queue(self, data: Dict[str, Any], user_id: str):
@@ -143,19 +194,21 @@ class ChipScannerMessageManager:
         with self.request_queue.mutex:
             self.request_queue.queue.clear()
         await self.conn_manager.broadcast(
-            {
-                Protocol.Key.STATUS_MSG: f"{user_id} cleared queue",
-                Protocol.Key.ACTION: Protocol.Action.CLEAR_QUEUE,
-                Protocol.Key.METADATA: {Protocol.Key.USER: user_id},
-            }
+            Message(metadata=ExecuteActionResponse(), payload=ClearQueue())
         )
 
-    async def send_login_result(self, success: bool, username: str, client_id: str):
+    async def send_login_result(self, success: bool, username: str, client_id: UUID):
         if success:
-            data = {
-                Protocol.Key.LOGIN: Protocol.Status.SUCCESS,
-                Protocol.Key.STATUS_MSG: f"Successfully logged in as {username}",
-            }
+            message = Message(
+                metadata=LoginResponse(
+                    status_msg=f"Successfully logged in as {username}",
+                    login_success=True,
+                )
+            )
         else:
-            data = {Protocol.Key.LOGIN: Protocol.Status.FAILURE}
-        await self.conn_manager.unicast(data, client_id)
+            message = Message(
+                metadata=LoginResponse(
+                    status_msg=f"Failed to log in as {username}", login_success=False
+                )
+            )
+        await self.conn_manager.unicast(message=message, client_id=client_id)

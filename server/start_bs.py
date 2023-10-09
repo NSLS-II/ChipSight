@@ -1,11 +1,7 @@
-from ophyd import Device, EpicsMotor
-from ophyd import Component as Cpt
-
-import bluesky.plan_stubs as bsps
-from bluesky.run_engine import RunEngine
-from bluesky.utils import PersistentDict
 import os
 
+from bluesky.run_engine import RunEngine
+from bluesky.utils import PersistentDict
 from databroker import Broker
 
 RE = RunEngine()
@@ -26,4 +22,5 @@ print("bluesky logging")
 
 if beamline == "fmx":
     from server.chip_scanner_plans import chip_scanner
+
     # chip_scanner.load_fiducials()

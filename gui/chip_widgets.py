@@ -1,16 +1,10 @@
-from typing import List, Dict, Any, Tuple
-from qtpy.QtCore import Qt, Signal
-from qtpy.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QPushButton,
-    QListView,
-    QLabel,
-    QGridLayout,
-    QApplication,
-)
-from model.chip import Chip
+from typing import Tuple
+
+from qtpy.QtCore import Qt, Signal  # type: ignore
+from qtpy.QtWidgets import QApplication, QGridLayout, QLabel, QPushButton, QWidget
+
 from gui.utils import update_button_style
+from model.chip import Chip
 
 
 class ChipGridWidget(QWidget):

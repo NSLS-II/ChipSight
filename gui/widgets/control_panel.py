@@ -1,13 +1,11 @@
-from qtpy import QtCore
-from qtpy.QtWidgets import (
-    QWidget,
-    QGridLayout,
-    QPushButton,
-)
-from gui.utils import send_message_to_server
-from model.comm_protocol import Protocol
-from .nudge_widget import NudgeWidget
 import typing
+
+from qtpy.QtWidgets import QGridLayout, QPushButton, QWidget
+
+from gui.utils import create_execute_action_request, send_message_to_server
+from model.comm_protocol import GoToFiducial, SetFiducial
+
+from .nudge_widget import NudgeWidget
 
 if typing.TYPE_CHECKING:
     from gui.websocket_client import WebSocketClient
@@ -53,10 +51,9 @@ class ControlPanelWidget(QWidget):
             return
         send_message_to_server(
             self.websocket_client,
-            {
-                Protocol.Key.ACTION: Protocol.Action.GO_TO_FIDUCIAL,
-                Protocol.Key.METADATA: {Protocol.Key.NAME: fiducial},
-            },
+            create_execute_action_request(
+                GoToFiducial(name=fiducial), client_id=self.websocket_client.uuid
+            ),
         )
 
     def set_fiducial(self, fiducial: str):
@@ -64,8 +61,7 @@ class ControlPanelWidget(QWidget):
             return
         send_message_to_server(
             self.websocket_client,
-            {
-                Protocol.Key.ACTION: Protocol.Action.SET_FIDUCIAL,
-                Protocol.Key.METADATA: {Protocol.Key.NAME: fiducial},
-            },
+            create_execute_action_request(
+                SetFiducial(name=fiducial), client_id=self.websocket_client.uuid
+            ),
         )

@@ -1,8 +1,10 @@
+from pathlib import Path
+
+import yaml
 from qtpy.QtWidgets import QApplication
+
 from gui.chip_widgets import Chip
 from gui.main_window import MainWindow
-import yaml
-from pathlib import Path
 
 # To run the application
 if __name__ == "__main__":

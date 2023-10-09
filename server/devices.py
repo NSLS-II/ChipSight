@@ -1,23 +1,19 @@
+from ophyd import Component as Cpt
 from ophyd import (
-    PVPositioner,
     Device,
-    Component as Cpt,
     EpicsMotor,
     EpicsSignal,
     EpicsSignalRO,
-)
-from ophyd import (
-    SingleTrigger,
-    ProsilicaDetector,
     ImagePlugin,
-    TIFFPlugin,
-    StatsPlugin,
-    ROIPlugin,
-    TransformPlugin,
     ProcessPlugin,
+    ProsilicaDetector,
+    PVPositioner,
+    ROIPlugin,
+    SingleTrigger,
+    StatsPlugin,
+    TIFFPlugin,
+    TransformPlugin,
 )
-
-from ophyd import Component as Cpt
 
 
 class Transmission(Device):

@@ -1,28 +1,35 @@
-import re
-import json
-from typing import Dict, Any
+from typing import Any, Dict
+
+from qtpy import QtCore
 from qtpy.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMainWindow,
     QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from datetime import datetime
-from qtpy import QtCore
-from model.chip import Chip
-from gui.dialogs import LoginDialog
-from gui.collection_queue import CollectionQueueWidget
-from gui.chip_widgets import ChipGridWidget, BlockGridWidget
-from gui.widgets import ControlPanelWidget
-from gui.websocket_client import WebSocketClient
-from model.comm_protocol import Protocol
 
+from gui.chip_widgets import BlockGridWidget, ChipGridWidget
+from gui.collection_queue import CollectionQueueWidget
+from gui.dialogs import LoginDialog
 from gui.microscope.microscope import Microscope
 from gui.microscope.plugins.c2c_plugin import C2CPlugin
 from gui.microscope.plugins.crosshair_plugin import CrossHairPlugin
+from gui.websocket_client import WebSocketClient
+from gui.widgets import ControlPanelWidget
+from model.chip import Chip
+from model.comm_protocol import (
+    ClearQueue,
+    CollectNeighborhood,
+    CollectRow,
+    ErrorResponse,
+    Message,
+    PayloadType,
+    QueueActionResponse,
+    RemoveFromQueue,
+)
 
 
 class MainWindow(QMainWindow):
@@ -35,7 +42,7 @@ class MainWindow(QMainWindow):
         self.server_url = f'{config["server"]["url"]}:{config["server"]["port"]}'
 
         self.websocket_client = WebSocketClient(server_url=self.server_url)
-        self.websocket_client.message_received.connect(self.handle_server_message)
+        self.websocket_client.message_received.connect(self.handle_server_response)
         self.websocket_client.start()
 
         self.setWindowTitle("ChipSight")
@@ -114,14 +121,14 @@ class MainWindow(QMainWindow):
         self.last_selected = (0, 0)
         self.last_selected_row = 0
 
-        self.collection_queue = CollectionQueueWidget(
+        self.collection_queue_widget = CollectionQueueWidget(
             self.chip,
             self.last_selected,
             self.collection_parameters,
             self.status_window,
             self.websocket_client,
         )
-        left_layout.addWidget(self.collection_queue)
+        left_layout.addWidget(self.collection_queue_widget)
 
         # Push the layouts up by adding stretch at the end
         left_layout.addStretch()
@@ -153,54 +160,40 @@ class MainWindow(QMainWindow):
     def set_last_selected(self, value: "tuple[int, int]"):
         self.last_selected = value
         self.block_grid.set_last_selected(value)
-        self.collection_queue.set_last_selected(value)
+        self.collection_queue_widget.set_last_selected(value)
         self.update()
 
-    def handle_server_message(self, message: str):
-        data = json.loads(message)
-        print(f"Server Message: {data}")
-        # Check if data is a broadcast
-        if Protocol.Key.BROADCAST in data:
-            bcast_data = data[Protocol.Key.BROADCAST]
-            # Check if broadcast contains an action
-            if Protocol.Key.ACTION in bcast_data:
-                # Get the action and related metadata
-                action = bcast_data[Protocol.Key.ACTION]
-                metadata = bcast_data[Protocol.Key.METADATA]
-                # Add to queue
-                if action == Protocol.Action.ADD_TO_QUEUE:
-                    req = metadata[Protocol.Key.REQUEST]
-                    self.collection_queue.collection_queue.add_to_queue(
-                        req[Protocol.Key.ADDRESS]
-                    )
-                # Clear queue
-                if action == Protocol.Action.CLEAR_QUEUE:
-                    self.collection_queue.collection_queue.queue = []
-            # Check if broadcast contains a status message
-            if Protocol.Key.STATUS_MSG in bcast_data:
-                self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {bcast_data[Protocol.Key.STATUS_MSG]}"
-                )
-        # Otherwise its unicast data
-        elif Protocol.Key.UNICAST in data:
-            unicast_data = data[Protocol.Key.UNICAST]
-            if Protocol.Key.LOGIN in unicast_data:
-                if unicast_data[Protocol.Key.LOGIN] == Protocol.Status.SUCCESS:
-                    self.login_modal.programmatic_close = True
-                    self.login_modal.close()
-
-            # Check if broadcast contains a status message
-            if Protocol.Key.STATUS_MSG in unicast_data:
-                self.status_window.append(
-                    f"{datetime.now().strftime('%H:%M:%S')} : {unicast_data[Protocol.Key.STATUS_MSG]}"
-                )
-        elif Protocol.Key.ERROR in data:
+    def handle_server_response(self, message: Message):
+        print("Message Type not implemented")
+        if isinstance(message.metadata, QueueActionResponse):
+            self.handle_queue_action(message.metadata, message.payload)
+        elif isinstance(message.metadata, ErrorResponse):
+            self.status_window.setTextColor(QtCore.Qt.GlobalColor.red)
             self.status_window.append(
-                f"{datetime.now().strftime('%H:%M:%S')} : {data[Protocol.Key.ERROR]}"
+                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
             )
+            self.status_window.setTextColor(QtCore.Qt.GlobalColor.black)
         else:
             self.status_window.append(
-                f"{datetime.now().strftime('%H:%M:%S')} : Unhandled message {data}"
+                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : Unhandled response - {message.metadata.__class__.__name__}"
+            )
+
+    def handle_queue_action(
+        self, metadata: QueueActionResponse, payload: PayloadType | None
+    ):
+        if metadata.status_msg:
+            self.status_window.append(
+                f"{metadata.timestamp.strftime('%H:%M:%S')} : {metadata.status_msg}"
+            )
+        if isinstance(payload, (CollectNeighborhood, CollectRow)):
+            self.collection_queue_widget.collection_queue.add_to_queue(payload)
+        elif isinstance(payload, ClearQueue):
+            self.collection_queue_widget.collection_queue.clear_queue()
+        elif isinstance(payload, RemoveFromQueue):
+            self.collection_queue_widget.collection_queue.removeRow(payload.index)
+        else:
+            self.status_window.append(
+                f"{metadata.timestamp.strftime('%H:%M:%S')} : Unhandled queue action - {payload.__class__.__name__}"
             )
 
     def update(self):

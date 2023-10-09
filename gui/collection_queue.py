@@ -1,22 +1,32 @@
-import json
-import asyncio
-from typing import List, Dict, Any, Tuple
-from qtpy.QtCore import Qt, QAbstractListModel, QModelIndex
-from qtpy.QtWidgets import QWidget, QVBoxLayout, QPushButton, QListView, QTextEdit
+from typing import Any, Dict, List, Tuple
+
+from qtpy.QtCore import QAbstractListModel, QModelIndex, Qt
+from qtpy.QtWidgets import QListView, QPushButton, QTextEdit, QVBoxLayout, QWidget
+
 from model.chip import Chip
-from model.comm_protocol import Protocol
+from model.comm_protocol import (
+    ClearQueue,
+    CollectNeighborhood,
+    CollectQueue,
+    CollectRow,
+)
+
+from .utils import (
+    create_add_to_queue_request,
+    create_execute_action_request,
+    send_message_to_server,
+)
 from .websocket_client import WebSocketClient
-from .utils import send_message_to_server
 
 
 class CollectionQueue(QAbstractListModel):
     def __init__(self, queue=None):
         super(CollectionQueue, self).__init__()
-        self.queue = queue or []
+        self.queue: List[CollectRow | CollectNeighborhood] = queue or []
 
     def data(self, index, role):
         if role == Qt.ItemDataRole.DisplayRole:
-            return self.queue[index.row()]
+            return self.queue[index.row()].location
 
     def rowCount(self, index):
         return len(self.queue)
@@ -28,10 +38,16 @@ class CollectionQueue(QAbstractListModel):
         self.queue.append(item)
         self.endInsertRows()
 
-    def remove_from_queue(self):
+    def clear_queue(self):
         self.beginResetModel()
         self.queue.clear()
         self.endResetModel()
+
+    def removeRow(self, row: int) -> bool:
+        self.beginRemoveRows(QModelIndex(), self.rowCount(row), self.rowCount(row))
+        self.queue.pop(row)
+        self.endRemoveRows()
+        return True
 
 
 class CollectionQueueWidget(QWidget):
@@ -51,7 +67,6 @@ class CollectionQueueWidget(QWidget):
         super().__init__()
         self.setLayout(QVBoxLayout())
         self._init_ui()
-        self.p = Protocol()
 
     def _init_ui(self):
         # Add to queue Button
@@ -82,15 +97,19 @@ class CollectionQueueWidget(QWidget):
     def add_to_queue(self):
         last_block = self.chip.blocks[self.last_selected[0]][self.last_selected[1]]
         selected_rows = [row for row in last_block.rows if row.selected]
+        wait_time = int(self.collection_parameters["exposure_time"]["widget"].text())
         if selected_rows:  # last selected block contains selected rows
             for row in selected_rows:
                 row.queued = "queued"
                 send_message_to_server(
                     self.websocket_client,
-                    {
-                        self.p.Key.ACTION: self.p.Action.ADD_TO_QUEUE,
-                        self.p.Key.METADATA: {self.p.Key.ADDRESS: row.address},
-                    },
+                    create_add_to_queue_request(
+                        CollectRow(
+                            location=row.address,
+                            wait_time=wait_time,
+                        ),
+                        client_id=self.websocket_client.uuid,
+                    ),
                 )
 
             last_block.queued = "partially queued"
@@ -105,14 +124,15 @@ class CollectionQueueWidget(QWidget):
                         block.queued = "queued"
                         for row in block.rows:
                             row.queued = "queued"
+
                         send_message_to_server(
                             self.websocket_client,
-                            {
-                                self.p.Key.ACTION: self.p.Action.ADD_TO_QUEUE,  # "add_to_queue",
-                                self.p.Key.METADATA: {
-                                    self.p.Key.ADDRESS: block.address
-                                },
-                            },
+                            create_add_to_queue_request(
+                                CollectNeighborhood(
+                                    location=block.address, wait_time=wait_time
+                                ),
+                                client_id=self.websocket_client.uuid,
+                            ),
                         )
         self.update()
 
@@ -120,30 +140,35 @@ class CollectionQueueWidget(QWidget):
     def clear_queue(self):
         send_message_to_server(
             self.websocket_client,
-            {self.p.Key.ACTION: self.p.Action.CLEAR_QUEUE},
+            create_execute_action_request(
+                ClearQueue(), client_id=self.websocket_client.uuid
+            ),
         )
         for block_row in self.chip.blocks:
             for block in block_row:
                 block.queued = "not queued"
                 for row in block.rows:
                     row.queued = "not queued"
-        self.collection_queue.remove_from_queue()
+        self.collection_queue.clear_queue()
         self.update()
 
     def collect_queue(self):
         send_message_to_server(
             self.websocket_client,
-            {self.p.Key.ACTION: self.p.Action.COLLECT_QUEUE},
+            create_execute_action_request(
+                CollectQueue(), client_id=self.websocket_client.uuid
+            ),
         )
         while self.collection_queue.queue:
             container_address = self.collection_queue.queue.pop(0)
-            if len(container_address) == 2:  # it's a block
+            if isinstance(container_address, CollectNeighborhood):  # it's a block
                 self.collect_block(container_address)
             else:  # it's a row
                 self.collect_row(container_address)
         self.update()
 
-    def collect_row(self, row_address):
+    def collect_row(self, data: CollectRow):
+        row_address = data.location
         x = ord(row_address[0]) - 65
         y = int(row_address[1]) - 1
         row_id = ord(row_address[2]) - 97
@@ -168,7 +193,8 @@ class CollectionQueueWidget(QWidget):
         ):  # exclude label row
             block.queued = "not queued"
 
-    def collect_block(self, block_address):
+    def collect_block(self, data: CollectNeighborhood):
+        block_address = data.location
         x = ord(block_address[0]) - 65
         y = int(block_address[1:]) - 1
         block = self.chip.blocks[x][y]
