@@ -199,7 +199,7 @@ class CollectRow(Payload):
     >>> CollectRow(location="A1a", wait_time=20)
     """
 
-    payload_type: Literal["collect_line"] = "collect_line"
+    payload_type: Literal["collect_row"] = "collect_row"
     location: str
     wait_time: int
 
