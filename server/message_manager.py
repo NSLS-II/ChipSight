@@ -39,7 +39,10 @@ class ChipScannerMessageManager:
         }
         self.valid_immediate_requests: Dict[Type[PayloadType], Callable] = {
             GoToFiducial: self.go_to_fiducial,
+            SetFiducial: self.set_fiducial,
             ClearQueue: self.clear_queue,
+            NudgeGonio: self.nudge_gonio,
+            CollectQueue: self.collect_queue
         }
 
     async def process_message(self, data: Message, user_id: str):
@@ -86,7 +89,7 @@ class ChipScannerMessageManager:
         if payload and type(payload) in self.valid_immediate_requests:
             run_engine_state = start_bs.RE.state
             if run_engine_state == "idle":
-                self.valid_immediate_requests[type(payload)](
+                await self.valid_immediate_requests[type(payload)](
                     ExecuteActionResponse(), payload
                 )
             elif run_engine_state == "running":
@@ -181,7 +184,7 @@ class ChipScannerMessageManager:
                 )
             )
             response = QueueActionResponse()
-            self.valid_queue_requests[type(item)](response, item)
+            await self.valid_queue_requests[type(item)](response, item)
 
             print(f"Completed : {item}")
 
