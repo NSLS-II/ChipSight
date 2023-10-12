@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
         self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin, CrossHairPlugin])  # type: ignore
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
-        self.microscope.url = self.config["sample_cam"]["url"]
+        self.microscope.urls = self.config["sample_cam"]["urls"]
         right_layout.addWidget(self.microscope)
         self.microscope.acquire(True)
 

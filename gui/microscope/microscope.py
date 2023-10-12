@@ -52,7 +52,9 @@ class Microscope(QWidget):
         self.fps: int = 5
         self.scale: List[int] = []
 
-        self.url: str = "http://localhost:8080/output.jpg"
+        self.urls: "list[str]" = ["http://localhost:8080/output.jpg"]
+        self.current_url_index = 0
+        self.url: str = self.urls[self.current_url_index]
 
         # self.downloader = Downloader(self)
         # self.downloader.imageReady.connect(self.updateImageData)
@@ -118,30 +120,19 @@ class Microscope(QWidget):
         return QWidget.eventFilter(self, obj, event)
 
     def mouse_wheel_event(self, event):
-        # Zoom Factor
-        zoomInFactor = 1.05
-        zoomOutFactor = 1 / zoomInFactor
-
-        # Set Anchors
-        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        self.view.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-
-        # Save the scene pos
-        oldPos = self.view.mapToScene(event.pos())
-
         # Zoom
-        if event.angleDelta().y() > 0:
-            zoomFactor = zoomInFactor
-        else:
-            zoomFactor = zoomOutFactor
-        self.view.scale(zoomFactor, zoomFactor)
+        if len(self.urls) > 1:
+            if event.angleDelta().y() > 0:
+                if self.current_url_index < len(self.urls) - 1:
+                    self.current_url_index += 1
+            else:
+                if self.current_url_index > 0:
+                    self.current_url_index -= 1
+            print(self.current_url_index)
+            self.videoThread.setUrl(self.urls[self.current_url_index])
+        
 
-        # Get the new position
-        newPos = self.view.mapToScene(event.pos())
-
-        # Move scene to old position
-        delta = newPos - oldPos
-        self.view.translate(delta.x(), delta.y())
+        
 
     def mouse_press_event(self, a0: QMouseEvent):
         if self.viewport:

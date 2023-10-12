@@ -55,7 +55,7 @@ async def put_visit(request: Request):
     date = data["date"]
     pi = data["pi"]
     print(data)
-    base_path = Path("/nsls2/data/fmx/proposals/")
+    base_path = Path("/nsls2/data/fmx/proposals/2023-3")
     data_path = Path(f"pass-{proposal_id}") / Path(f"{proposal_id}-{date}-{pi}")
     if "commissioning" in data:
         path = base_path / Path("commissioning") / data_path
