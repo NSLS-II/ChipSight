@@ -31,6 +31,7 @@ from model.comm_protocol import (
     RemoveFromQueue,
     StatusResponse,
 )
+from datetime import datetime
 
 
 class MainWindow(QMainWindow):
@@ -165,22 +166,27 @@ class MainWindow(QMainWindow):
         self.update()
 
     def handle_server_response(self, message: Message):
-        if isinstance(message.metadata, QueueActionResponse):
-            self.handle_queue_action(message.metadata, message.payload)
-        elif isinstance(message.metadata, ErrorResponse):
-            self.status_window.setTextColor(QtCore.Qt.GlobalColor.red)
-            self.status_window.append(
-                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
-            )
-            self.status_window.setTextColor(QtCore.Qt.GlobalColor.black)
-        elif isinstance(message.metadata, StatusResponse):
-            self.status_window.append(
-                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
-            )
+        if isinstance(message, Message):
+            if isinstance(message.metadata, QueueActionResponse):
+                self.handle_queue_action(message.metadata, message.payload)
+            elif isinstance(message.metadata, ErrorResponse):
+                self.status_window.setTextColor(QtCore.Qt.GlobalColor.red)
+                self.status_window.append(
+                    f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
+                )
+                self.status_window.setTextColor(QtCore.Qt.GlobalColor.black)
+            elif isinstance(message.metadata, StatusResponse):
+                self.status_window.append(
+                    f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
+                )
+            else:
+                self.status_window.append(
+                    f"{message.metadata.timestamp.strftime('%H:%M:%S')} : Unhandled response - {message.metadata.__class__.__name__}"
+                )
         else:
             self.status_window.append(
-                f"{message.metadata.timestamp.strftime('%H:%M:%S')} : Unhandled response - {message.metadata.__class__.__name__}"
-            )
+                    f"{datetime.now()} : Unhandled response - {message}"
+                )
 
     def handle_queue_action(
         self, metadata: QueueActionResponse, payload: PayloadType | None

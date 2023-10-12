@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, Depends
 from typing import Union, Any
 from fastapi.responses import HTMLResponse
-from server.dependencies import get_user_info, templates, proposal_id, date, pi, path
+from server.dependencies import get_user_info, templates, proposal_id, date, pi, path, set_path
 from datetime import datetime
 from pathlib import Path
 
@@ -61,6 +61,7 @@ async def put_visit(request: Request):
         path = base_path / Path("commissioning") / data_path
     else:
         path = base_path / data_path
+    set_path(path)
     return f"""<div>Proposal changed successfully to {path} </div>"""
 
 
