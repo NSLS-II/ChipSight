@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict
 
 from qtpy import QtCore
@@ -25,13 +26,13 @@ from model.comm_protocol import (
     CollectNeighborhood,
     CollectRow,
     ErrorResponse,
+    ExecuteActionResponse,
     Message,
     PayloadType,
     QueueActionResponse,
     RemoveFromQueue,
     StatusResponse,
 )
-from datetime import datetime
 
 
 class MainWindow(QMainWindow):
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
         self.websocket_client = WebSocketClient(server_url=self.server_url)
         self.websocket_client.message_received.connect(self.handle_server_response)
         self.websocket_client.start()
+        self.websocket_client.websocket
 
         self.setWindowTitle("ChipSight")
 
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
             self.status_window,
             self.websocket_client,
         )
+        self.collection_queue_widget.setMaximumHeight(200)
         left_layout.addWidget(self.collection_queue_widget)
 
         # Push the layouts up by adding stretch at the end
@@ -169,6 +172,10 @@ class MainWindow(QMainWindow):
         if isinstance(message, Message):
             if isinstance(message.metadata, QueueActionResponse):
                 self.handle_queue_action(message.metadata, message.payload)
+            elif isinstance(message.metadata, ExecuteActionResponse):
+                self.status_window.append(
+                    f"{message.metadata.timestamp.strftime('%H:%M:%S')} : {message.metadata.status_msg}"
+                )
             elif isinstance(message.metadata, ErrorResponse):
                 self.status_window.setTextColor(QtCore.Qt.GlobalColor.red)
                 self.status_window.append(
@@ -185,8 +192,8 @@ class MainWindow(QMainWindow):
                 )
         else:
             self.status_window.append(
-                    f"{datetime.now()} : Unhandled response - {message}"
-                )
+                f"{datetime.now()} : Unhandled response - {message}"
+            )
 
     def handle_queue_action(
         self, metadata: QueueActionResponse, payload: PayloadType | None

@@ -1,17 +1,28 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import Mock
 
+import yaml
 from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
 from server.manager import ConnectionManager
 from server.message_manager import ChipScannerMessageManager
 
-from server import start_bs
+config = yaml.safe_load(open("server_config.yml", "r"))
+
+
+if not config.get("test", False):
+    from server import bluesky_env
+else:
+    bluesky_env = Mock()
+    bluesky_env.RE.state = "idle"
 
 conn_manager = ConnectionManager()
-csm_manager = ChipScannerMessageManager(connection_manager=conn_manager)
+csm_manager = ChipScannerMessageManager(
+    connection_manager=conn_manager, bluesky_env=bluesky_env
+)
 secrets = json.load(open("secrets.json", "r"))
 
 templates = Jinja2Templates(directory="server/templates")
@@ -25,7 +36,7 @@ path = Path("")
 def set_path(new_path: Path):
     global path
     path = new_path
-    start_bs.chip_scanner.filepath = str(path)
+    bluesky_env.chip_scanner.filepath = str(path)
 
 
 def get_user_info(request: Request):

@@ -22,11 +22,14 @@ class Metadata(BaseModel):
         The time at which the message is created, default is the current time.
     message_type : str
         The type of the message being sent.
+    status_msg : str
+        Message to be displayed to the UI
     """
 
     user_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.now)
     message_type: str
+    status_msg: str = ""
 
 
 class QueueRequest(Metadata):
@@ -56,7 +59,6 @@ class QueueActionResponse(Metadata):
     """
 
     message_type: Literal["queue_response"] = "queue_response"
-    status_msg: str = ""
 
 
 class ExecuteActionResponse(Metadata):
@@ -74,7 +76,6 @@ class ErrorResponse(Metadata):
     """
 
     message_type: Literal["error"] = "error"
-    status_msg: str = ""
 
 
 class LoginResponse(Metadata):
@@ -83,13 +84,11 @@ class LoginResponse(Metadata):
     """
 
     message_type: Literal["login"] = "login"
-    status_msg: str = ""
     login_success: bool
 
 
 class StatusResponse(Metadata):
     message_type: Literal["status"] = "status"
-    status_msg: str = ""
 
 
 MetadataType = Union[

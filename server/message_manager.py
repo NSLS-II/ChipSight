@@ -21,17 +21,21 @@ from model.comm_protocol import (
     QueueRequest,
     SetFiducial,
 )
-from server import start_bs
 
 from .manager import ConnectionManager
+
+# from server import start_bs
+# from server.dependencies import bluesky_env
+
 
 T = TypeVar("T", bound=PayloadType)
 
 
 class ChipScannerMessageManager:
-    def __init__(self, connection_manager: ConnectionManager):
+    def __init__(self, connection_manager: ConnectionManager, bluesky_env):
         self.name = "Chip scanner manager"
         self.conn_manager = connection_manager
+        self.bluesky_env = bluesky_env
         self.request_queue: Queue[PayloadType] = Queue()
         self.valid_queue_requests: Dict[Type[PayloadType], Callable] = {
             CollectNeighborhood: self.collect_neighborhood,
@@ -42,7 +46,7 @@ class ChipScannerMessageManager:
             SetFiducial: self.set_fiducial,
             ClearQueue: self.clear_queue,
             NudgeGonio: self.nudge_gonio,
-            CollectQueue: self.collect_queue
+            CollectQueue: self.collect_queue,
         }
 
     async def process_message(self, data: Message, user_id: str):
@@ -87,7 +91,7 @@ class ChipScannerMessageManager:
         self, metadata: ExecuteRequest, payload: Optional[PayloadType]
     ):
         if payload and type(payload) in self.valid_immediate_requests:
-            run_engine_state = start_bs.RE.state
+            run_engine_state = self.bluesky_env.RE.state
             if run_engine_state == "idle":
                 await self.valid_immediate_requests[type(payload)](
                     ExecuteActionResponse(), payload
@@ -114,34 +118,44 @@ class ChipScannerMessageManager:
     async def go_to_fiducial(
         self, response_metadata: MetadataType, payload: GoToFiducial
     ):
-        start_bs.RE(start_bs.chip_scanner.drive_to_fiducial(payload.name))
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.drive_to_fiducial(payload.name)
+        )
+        response_metadata.status_msg = f"Going to fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def nudge_gonio(self, response_metadata: MetadataType, payload: NudgeGonio):
-        start_bs.RE(
-            start_bs.chip_scanner.nudge_by(
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.nudge_by(
                 payload.x_delta,
                 payload.y_delta,
             )
+        )
+        response_metadata.status_msg = (
+            f"Nudging gonio by x={payload.x_delta}, y={payload.y_delta}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def set_fiducial(self, response_metadata: MetadataType, payload: SetFiducial):
-        start_bs.chip_scanner.manual_set_fiducial(payload.name)
+        self.bluesky_env.chip_scanner.manual_set_fiducial(payload.name)
+        response_metadata.status_msg = f"Setting fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def move_gonio(self, response_metadata: MetadataType, payload: MoveGonio):
-        start_bs.RE(
-            start_bs.chip_scanner.drive_to_position(
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.drive_to_position(
                 payload.x_pos,
                 payload.y_pos,
             )
+        )
+        response_metadata.status_msg = (
+            f"Moving gonio to x={payload.x_pos}, y={payload.y_pos}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
@@ -150,20 +164,26 @@ class ChipScannerMessageManager:
     async def collect_neighborhood(
         self, response_metadata: MetadataType, payload: CollectNeighborhood
     ):
-        start_bs.RE(
-            start_bs.chip_scanner.ppmac_neighbourhood_scan(
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.ppmac_neighbourhood_scan(
                 payload.location, payload.wait_time
             )
+        )
+        response_metadata.status_msg = (
+            f"Collecting block {payload.location} with wait time {payload.wait_time}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def collect_row(self, response_metadata: MetadataType, payload: CollectRow):
-        start_bs.RE(
-            start_bs.chip_scanner.ppmac_single_line_scan(
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.ppmac_single_line_scan(
                 payload.location, payload.wait_time
             )
+        )
+        response_metadata.status_msg = (
+            f"Collecting row {payload.location} with wait time {payload.wait_time}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
@@ -197,7 +217,10 @@ class ChipScannerMessageManager:
         with self.request_queue.mutex:
             self.request_queue.queue.clear()
         await self.conn_manager.broadcast(
-            Message(metadata=ExecuteActionResponse(), payload=ClearQueue())
+            Message(
+                metadata=QueueActionResponse(status_msg=f"{user_id} cleared the queue"),
+                payload=ClearQueue(),
+            )
         )
 
     async def send_login_result(self, success: bool, username: str, client_id: UUID):
