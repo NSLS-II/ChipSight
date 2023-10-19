@@ -128,7 +128,6 @@ class Microscope(QWidget):
             else:
                 if self.current_url_index > 0:
                     self.current_url_index -= 1
-            print(self.current_url_index)
             self.videoThread.setUrl(self.urls[self.current_url_index])
         
 

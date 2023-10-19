@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Tuple
 
 from qtpy.QtCore import QAbstractListModel, QModelIndex, Qt
-from qtpy.QtWidgets import QListView, QPushButton, QTextEdit, QVBoxLayout, QWidget
+from qtpy.QtWidgets import QListView, QPushButton, QTextEdit, QVBoxLayout, QWidget, QHBoxLayout
 
 from model.chip import Chip
 from model.comm_protocol import (
@@ -69,10 +69,12 @@ class CollectionQueueWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
+        button_layout = QHBoxLayout()
         # Add to queue Button
         self.add_to_queue_button = QPushButton("Add to queue")
         self.add_to_queue_button.clicked.connect(self.add_to_queue)
-        self.layout().addWidget(self.add_to_queue_button)
+        button_layout.addWidget(self.add_to_queue_button)
+        self.layout().addLayout(button_layout)
 
         # Queue list
         self.collection_queue = CollectionQueue()
@@ -83,12 +85,12 @@ class CollectionQueueWidget(QWidget):
         # Clear queue Button
         self.clear_queue_button = QPushButton("Clear queue")
         self.clear_queue_button.clicked.connect(self.clear_queue)
-        self.layout().addWidget(self.clear_queue_button)
+        button_layout.addWidget(self.clear_queue_button)
 
         # Collect queue Button
         self.collect_queue_button = QPushButton("Collect queue")
         self.collect_queue_button.clicked.connect(self.collect_queue)
-        self.layout().addWidget(self.collect_queue_button)
+        button_layout.addWidget(self.collect_queue_button)
 
     def set_last_selected(self, last_selected: Tuple[int, int]):
         self.last_selected = last_selected

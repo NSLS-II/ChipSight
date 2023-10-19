@@ -454,7 +454,7 @@ class ChipScanner(Device):
     def save_fiducials(self, filepath):
         with open(filepath, "ab") as f:
             for arr in self.get_fiducials():
-                if arr:
+                if arr is not None:
                     np.save(f, arr)
 
     def load_fiducials(self, filepath):

@@ -1,1 +1,3 @@
-test: true
+test: false
+fiducial_file: "fiducial.numpy"
+proposal_config: "proposal_config.yml"

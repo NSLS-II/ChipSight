@@ -47,8 +47,7 @@ class MainWindow(QMainWindow):
         self.websocket_client = WebSocketClient(server_url=self.server_url)
         self.websocket_client.message_received.connect(self.handle_server_response)
         self.websocket_client.start()
-        self.websocket_client.websocket
-
+        
         self.setWindowTitle("ChipSight")
 
         # Main layout
@@ -120,6 +119,8 @@ class MainWindow(QMainWindow):
         # Status window
         self.status_window = QTextEdit()
         self.status_window.setReadOnly(True)
+        self.status_label = QLabel("Status:")
+        left_layout.addWidget(self.status_label)
         left_layout.addWidget(self.status_window)
 
         self.last_selected = (0, 0)

@@ -1,6 +1,7 @@
 from queue import Queue
 from typing import Any, Callable, Dict, Optional, Type, TypeVar
 from uuid import UUID
+from pathlib import Path
 
 from model.comm_protocol import (
     ClearQueue,
@@ -24,19 +25,17 @@ from model.comm_protocol import (
 
 from .manager import ConnectionManager
 
-# from server import start_bs
-# from server.dependencies import bluesky_env
-
 
 T = TypeVar("T", bound=PayloadType)
 
 
 class ChipScannerMessageManager:
-    def __init__(self, connection_manager: ConnectionManager, bluesky_env):
+    def __init__(self, connection_manager: ConnectionManager, bluesky_env, config):
         self.name = "Chip scanner manager"
         self.conn_manager = connection_manager
         self.bluesky_env = bluesky_env
         self.request_queue: Queue[PayloadType] = Queue()
+        self.config = config
         self.valid_queue_requests: Dict[Type[PayloadType], Callable] = {
             CollectNeighborhood: self.collect_neighborhood,
             CollectRow: self.collect_row,
@@ -48,6 +47,9 @@ class ChipScannerMessageManager:
             NudgeGonio: self.nudge_gonio,
             CollectQueue: self.collect_queue,
         }
+        p = Path(self.config["fiducial_file"])
+        if p.exists():
+            self.bluesky_env.chip_scanner.load_fiducials(str(p))
 
     async def process_message(self, data: Message, user_id: str):
         if isinstance(data.metadata, QueueRequest):
@@ -142,6 +144,8 @@ class ChipScannerMessageManager:
 
     async def set_fiducial(self, response_metadata: MetadataType, payload: SetFiducial):
         self.bluesky_env.chip_scanner.manual_set_fiducial(payload.name)
+        if self.bluesky_env.chip_scanner.F0 is not None and self.bluesky_env.chip_scanner.F1 is not None and self.bluesky_env.chip_scanner.F2 is not None:
+            self.bluesky_env.chip_scanner.save_fiducials(self.config["fiducial_file"])
         response_metadata.status_msg = f"Setting fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)

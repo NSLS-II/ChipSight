@@ -11,7 +11,17 @@ from server.manager import ConnectionManager
 from server.message_manager import ChipScannerMessageManager
 
 config = yaml.safe_load(open("server_config.yml", "r"))
+prop_config_file = Path(config["proposal_config"])
+proposal_config = {
+        "proposal_id" : 999999,
+        "date" : datetime.now().strftime("%Y%m%d"),
+        "pi" : None,
+        "path" : Path("")
+    }
+if prop_config_file.exists():
+    proposal_config = yaml.safe_load(prop_config_file.open())
 
+    
 
 if not config.get("test", False):
     from server import bluesky_env
@@ -21,22 +31,24 @@ else:
 
 conn_manager = ConnectionManager()
 csm_manager = ChipScannerMessageManager(
-    connection_manager=conn_manager, bluesky_env=bluesky_env
+    connection_manager=conn_manager, bluesky_env=bluesky_env, config=config
 )
 secrets = json.load(open("secrets.json", "r"))
 
 templates = Jinja2Templates(directory="server/templates")
 
-proposal_id = 999999
-date = datetime.now().strftime("%Y%m%d")
-pi = None
-path = Path("")
 
+def set_proposal_config(new_path: Path, proposal_id, date, pi):
+    print(f"{ proposal_config= }")
+    proposal_config['path'] = str(new_path)
+    bluesky_env.chip_scanner.filepath = str(new_path)
 
-def set_path(new_path: Path):
-    global path
-    path = new_path
-    bluesky_env.chip_scanner.filepath = str(path)
+    proposal_config['proposal_id'] = proposal_id
+    proposal_config["date"] = date
+    proposal_config["pi"] = pi
+    with prop_config_file.open('w') as f:
+        yaml.safe_dump(proposal_config, f)
+
 
 
 def get_user_info(request: Request):
