@@ -29,6 +29,8 @@ else:
     bluesky_env = Mock()
     bluesky_env.RE.state = "idle"
 
+bluesky_env.chip_scanner.filepath = proposal_config["path"]
+
 conn_manager = ConnectionManager()
 csm_manager = ChipScannerMessageManager(
     connection_manager=conn_manager, bluesky_env=bluesky_env, config=config
