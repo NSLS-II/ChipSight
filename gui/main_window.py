@@ -10,6 +10,7 @@ from qtpy.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QPushButton
 )
 
 from gui.chip_widgets import BlockGridWidget, ChipGridWidget
@@ -46,6 +47,7 @@ class MainWindow(QMainWindow):
 
         self.websocket_client = WebSocketClient(server_url=self.server_url)
         self.websocket_client.message_received.connect(self.handle_server_response)
+        self.websocket_client.connection_status.connect(self.handle_connection_status)
         self.websocket_client.start()
         
         self.setWindowTitle("ChipSight")
@@ -136,6 +138,17 @@ class MainWindow(QMainWindow):
         self.collection_queue_widget.setMaximumHeight(200)
         left_layout.addWidget(self.collection_queue_widget)
 
+        self.connection_status_label = QLabel("Connection Status: ")
+        self.connection_status_value_label = QLabel("Establishing connection...")
+        self.reconnect_button = QPushButton("Reconnect")
+        self.reconnect_button.setEnabled(False)
+        self.reconnect_button.clicked.connect(self.reconnect)
+        connection_label_layouts = QHBoxLayout()
+        connection_label_layouts.addWidget(self.connection_status_label)
+        connection_label_layouts.addWidget(self.connection_status_value_label)
+        connection_label_layouts.addWidget(self.reconnect_button)
+        left_layout.addLayout(connection_label_layouts)
+
         # Push the layouts up by adding stretch at the end
         left_layout.addStretch()
         right_layout.addStretch()
@@ -149,6 +162,14 @@ class MainWindow(QMainWindow):
             self.show_login_modal()
 
         self.update()
+
+    def handle_connection_status(self, connection_status: str):
+        self.connection_status_value_label.setText(connection_status)
+        if connection_status == "Disconnected":
+            self.reconnect_button.setEnabled(True)
+        else:
+            self.reconnect_button.setEnabled(False) 
+
 
     def show_login_modal(self):
         self.login_modal = LoginDialog(
@@ -225,3 +246,6 @@ class MainWindow(QMainWindow):
         self.block_label.setText(f"Current city block: {block_address}")
 
         self.block_grid.update_widget()
+
+    def reconnect(self):
+        self.websocket_client.start()
