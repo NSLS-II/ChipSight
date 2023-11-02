@@ -2,7 +2,8 @@ from queue import Queue
 from typing import Any, Callable, Dict, Optional, Type, TypeVar
 from uuid import UUID
 from pathlib import Path
-
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 from model.comm_protocol import (
     ClearQueue,
     CollectNeighborhood,
@@ -165,34 +166,60 @@ class ChipScannerMessageManager:
             Message(metadata=response_metadata, payload=payload)
         )
 
+    def run_neighborhood_scan(self, location, wait_time):
+        return self.bluesky_env.RE(
+                self.bluesky_env.chip_scanner.ppmac_neighbourhood_scan(
+                    location, wait_time
+                )
+            )
+    
+    def run_row_scan(self, location, wait_time):
+        return self.bluesky_env.RE(
+                self.bluesky_env.chip_scanner.ppmac_single_line_scan(
+                    location, wait_time
+                )
+            )
+    
     async def collect_neighborhood(
         self, response_metadata: MetadataType, payload: CollectNeighborhood
     ):
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.ppmac_neighbourhood_scan(
-                payload.location, payload.wait_time
-            )
-        )
         response_metadata.status_msg = (
             f"Collecting block {payload.location} with wait time {payload.wait_time}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as pool:
+            uid, status = await loop.run_in_executor(pool, self.run_neighborhood_scan, *[payload.location, payload.wait_time])
+            
+
+        response_metadata.status_msg = (
+            f"Finished collecting block {payload.location} with status: {status}"
+        )
+        await self.conn_manager.broadcast(
+            Message(metadata=response_metadata, payload=payload)
+        )
 
     async def collect_row(self, response_metadata: MetadataType, payload: CollectRow):
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.ppmac_single_line_scan(
-                payload.location, payload.wait_time
-            )
-        )
         response_metadata.status_msg = (
             f"Collecting row {payload.location} with wait time {payload.wait_time}"
         )
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as pool:
+            uid, status = await loop.run_in_executor(pool, self.run_row_scan, *[payload.location, payload.wait_time])
 
+        response_metadata.status_msg = (
+            f"Finished collecting row {payload.location} with status: {status}"
+        )
+        await self.conn_manager.broadcast(
+            Message(metadata=response_metadata, payload=payload)
+        )
+
+    
     async def collect_queue(self, data: Dict[str, Any], user_id: str):
         """
         Runs all tasks in the queue. Ideally will be excuted by the BlueSky run engine
