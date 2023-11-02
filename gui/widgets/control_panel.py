@@ -21,32 +21,36 @@ class ControlPanelWidget(QWidget):
         self.websocket_client = websocket_client
         fidu_buttons = QGridLayout()
 
-        F0_button = QPushButton("F0")
-        F0_button.clicked.connect(lambda: self.go_to_fiducial("F0"))
-        set_F0_button = QPushButton("Set F0")
-        set_F0_button.clicked.connect(lambda: self.set_fiducial("F0"))
+        self.F0_button = QPushButton("F0")
+        self.F0_button.clicked.connect(lambda: self.go_to_fiducial("F0"))
+        self.set_F0_button = QPushButton("Set F0")
+        self.set_F0_button.clicked.connect(lambda: self.set_fiducial("F0"))
 
-        F1_button = QPushButton("F1")
-        F1_button.clicked.connect(lambda: self.go_to_fiducial("F1"))
-        set_F1_button = QPushButton("Set F1")
-        set_F1_button.clicked.connect(lambda: self.set_fiducial("F1"))
+        self.F1_button = QPushButton("F1")
+        self.F1_button.clicked.connect(lambda: self.go_to_fiducial("F1"))
+        self.set_F1_button = QPushButton("Set F1")
+        self.set_F1_button.clicked.connect(lambda: self.set_fiducial("F1"))
 
-        F2_button = QPushButton("F2")
-        F2_button.clicked.connect(lambda: self.go_to_fiducial("F2"))
-        set_F2_button = QPushButton("Set F2")
-        set_F2_button.clicked.connect(lambda: self.set_fiducial("F2"))
+        self.F2_button = QPushButton("F2")
+        self.F2_button.clicked.connect(lambda: self.go_to_fiducial("F2"))
+        self.set_F2_button = QPushButton("Set F2")
+        self.set_F2_button.clicked.connect(lambda: self.set_fiducial("F2"))
 
-        fidu_buttons.addWidget(F0_button, 0, 1)
-        fidu_buttons.addWidget(set_F0_button, 0, 2)
-        fidu_buttons.addWidget(F1_button, 1, 1)
-        fidu_buttons.addWidget(set_F1_button, 1, 2)
-        fidu_buttons.addWidget(F2_button, 2, 1)
-        fidu_buttons.addWidget(set_F2_button, 2, 2)
+        fidu_buttons.addWidget(self.F0_button, 0, 1)
+        fidu_buttons.addWidget(self.set_F0_button, 0, 2)
+        fidu_buttons.addWidget(self.F1_button, 1, 1)
+        fidu_buttons.addWidget(self.set_F1_button, 1, 2)
+        fidu_buttons.addWidget(self.F2_button, 2, 1)
+        fidu_buttons.addWidget(self.set_F2_button, 2, 2)
         nudge_widget = NudgeWidget(parent=self, websocket_client=self.websocket_client)
         fidu_buttons.addWidget(nudge_widget, 0, 0, 3, 1)
         self.setLayout(fidu_buttons)
 
     def go_to_fiducial(self, fiducial: str):
+        for button in [self.F0_button, self.F1_button, self.F2_button]:
+            button.setStyleSheet("")
+        button = getattr(self, f"{fiducial}_button")
+        button.setStyleSheet("background-color : green")
         if not self.websocket_client:
             return
         send_message_to_server(
@@ -57,6 +61,10 @@ class ControlPanelWidget(QWidget):
         )
 
     def set_fiducial(self, fiducial: str):
+        for button in [self.set_F0_button, self.set_F1_button, self.set_F2_button]:
+            button.setStyleSheet("")
+        button = getattr(self, f"set_{fiducial}_button")
+        button.setStyleSheet("background-color : green")
         if not self.websocket_client:
             return
         send_message_to_server(
