@@ -1,0 +1,3 @@
+qtpy
+pyqt5
+opencv-python-headless

@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+bluesky
+databroker
+pyepics
+mxtools
+h5py
+area_detector_handlers
+httpx
+websockets
+python-multipart
