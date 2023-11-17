@@ -1,9 +1,29 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Optional, Union
+from typing import Literal, Optional, Union, Tuple
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+
+# =============================================================================
+# Section 0: General data
+# =============================================================================
+
+class VideoDimensions(BaseModel):
+    width: int
+    height: int
+
+class Point(BaseModel):
+    x: float
+    y: float
+    z: Optional[float] = None
+
+class PointDelta(BaseModel):
+    x_delta: float
+    y_delta: float
+    z_delta: Optional[float] = None
+
 
 # =============================================================================
 # Section 1: Metadata
@@ -113,6 +133,17 @@ class Payload(BaseModel):
     """
 
     payload_type: str
+
+
+class ClickToCenter(Payload):
+    """
+    Delta in pixels from the center of the camera feed
+    Along with the zoom level defined in the GUI
+    """
+    payload_type: Literal["click_to_center"] = "click_to_center"
+    pixel_delta: PointDelta
+    video_dimensions: VideoDimensions
+    zoom_level: int
 
 
 class NudgeGonio(Payload):
@@ -241,6 +272,7 @@ PayloadType = Union[
     ClearQueue,
     CollectQueue,
     RemoveFromQueue,
+    ClickToCenter
 ]
 
 # =============================================================================
@@ -251,3 +283,5 @@ PayloadType = Union[
 class Message(BaseModel):
     metadata: MetadataType
     payload: Optional[PayloadType] = None
+
+

@@ -22,10 +22,11 @@ from model.comm_protocol import (
     QueueActionResponse,
     QueueRequest,
     SetFiducial,
+    ClickToCenter
 )
 
 from .manager import ConnectionManager
-
+from .devices import cam_7, cam_8
 
 T = TypeVar("T", bound=PayloadType)
 
@@ -47,6 +48,7 @@ class ChipScannerMessageManager:
             ClearQueue: self.clear_queue,
             NudgeGonio: self.nudge_gonio,
             CollectQueue: self.collect_queue,
+            ClickToCenter: self.click_to_center
         }
         p = Path(self.config["fiducial_file"])
         if p.exists():
@@ -143,6 +145,32 @@ class ChipScannerMessageManager:
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
+
+    async def click_to_center(self, response_metadata: MetadataType, payload: ClickToCenter):
+        # LowMagCal.get provides the microns/pixel ratio
+        zoom_levels = [self.bluesky_env.BL_calibration.LoMagCal.get(), self.bluesky_env.BL_calibration.LoMagCal.get(), 
+                       self.bluesky_env.BL_calibration.HiMagCal.get(), self.bluesky_env.BL_calibration.HiMagCal.get()]
+        rois = [cam_7.roi2, cam_7.roi3, cam_8.roi2, cam_8.roi1]
+        final_x_pixel_delta = payload.pixel_delta.x_delta * (rois[payload.zoom_level].size.x.get() / payload.video_dimensions.width)
+        final_y_pixel_delta = payload.pixel_delta.y_delta * (rois[payload.zoom_level].size.y.get() / payload.video_dimensions.height)
+        x_microns = final_x_pixel_delta * zoom_levels[payload.zoom_level]
+        y_microns = final_y_pixel_delta * zoom_levels[payload.zoom_level]
+        print(x_microns, y_microns)
+        self.bluesky_env.RE(
+            self.bluesky_env.chip_scanner.nudge_by(
+                x_microns,
+                y_microns,
+                0
+            )
+        )
+        
+        response_metadata.status_msg = (
+            f"Nudging gonio by x={x_microns}, y={y_microns}"
+        )
+        await self.conn_manager.broadcast(
+            Message(metadata=response_metadata, payload=payload)
+        )
+
 
     async def set_fiducial(self, response_metadata: MetadataType, payload: SetFiducial):
         self.bluesky_env.chip_scanner.manual_set_fiducial(payload.name)

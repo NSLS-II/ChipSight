@@ -16,9 +16,11 @@ from qtpy.QtWidgets import (
 from gui.chip_widgets import BlockGridWidget, ChipGridWidget
 from gui.collection_queue import CollectionQueueWidget
 from gui.dialogs import LoginDialog
-from gui.microscope.microscope import Microscope
-from gui.microscope.plugins.c2c_plugin import C2CPlugin
-from gui.microscope.plugins.crosshair_plugin import CrossHairPlugin
+from gui.utils import send_message_to_server, create_execute_action_request
+from qmicroscope.microscope import Microscope
+from qmicroscope.plugins.c2c_plugin import C2CPlugin
+from qmicroscope.plugins.crosshair_plugin import CrossHairPlugin
+from qmicroscope.plugins.mousewheel_camera_zoom import MouseWheelCameraZoomPlugin
 from gui.websocket_client import WebSocketClient
 from gui.widgets import ControlPanelWidget
 from model.chip import Chip
@@ -33,6 +35,9 @@ from model.comm_protocol import (
     QueueActionResponse,
     RemoveFromQueue,
     StatusResponse,
+    ClickToCenter,
+    PointDelta,
+    VideoDimensions
 )
 
 
@@ -102,10 +107,14 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(right_layout)
 
         # Setup Q microscope
-        self.microscope = Microscope(self, viewport=False, plugins=[C2CPlugin, CrossHairPlugin])  # type: ignore
+        plugins=[C2CPlugin, CrossHairPlugin, MouseWheelCameraZoomPlugin]
+        self.microscope = Microscope(self, viewport=False, plugins=plugins)  # type: ignore
         self.microscope.scale = [0, 400]
         self.microscope.fps = 30
-        self.microscope.urls = self.config["sample_cam"]["urls"]
+        # Adding camera urls to MouseWheelCameraZoomPlugin
+        self.microscope.plugins["MouseWheelCameraZoomPlugin"].urls = self.config["sample_cam"]["urls"]
+        # C2CPlugin provides pixel co-ordinates of click, and zoom level
+        self.microscope.plugins["C2CPlugin"].clicked_signal.clicked.connect(self.click_to_center)
         right_layout.addWidget(self.microscope)
         self.microscope.acquire(True)
 
@@ -162,6 +171,22 @@ class MainWindow(QMainWindow):
             self.show_login_modal()
 
         self.update()
+
+    def click_to_center(self, data):
+        y_delta = data["y_pixel_delta"]
+        x_delta = data["x_pixel_delta"]
+        pd = PointDelta(x_delta=x_delta, y_delta=y_delta)
+        vd = VideoDimensions(width=self.microscope.view.viewport().width(),
+                             height=self.microscope.view.viewport().height())
+        zoom_level = self.microscope.plugins["MouseWheelCameraZoomPlugin"].current_url_index
+        c2c_payload = ClickToCenter(pixel_delta=pd,
+                                    video_dimensions=vd,
+                                    zoom_level=zoom_level)
+        print(c2c_payload)
+        send_message_to_server(self.websocket_client, 
+                               create_execute_action_request(c2c_payload, self.websocket_client.uuid))
+
+
 
     def handle_connection_status(self, connection_status: str):
         self.connection_status_value_label.setText(connection_status)

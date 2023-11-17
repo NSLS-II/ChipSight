@@ -21,6 +21,6 @@ config_bluesky_logging()
 print("bluesky logging")
 
 if beamline == "fmx":
-    from server.chip_scanner_plans import chip_scanner
+    from server.chip_scanner_plans import chip_scanner, BL_calibration
 
     # chip_scanner.load_fiducials()
