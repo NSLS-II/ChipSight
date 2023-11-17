@@ -62,7 +62,7 @@ def update_button_style(
 
 def send_message_to_server(client: WebSocketClient, message: Message):
     asyncio.run_coroutine_threadsafe(
-        client.send(message.json()),
+        client.send(message.model_dump_json()),
         client.loop,
     )
 
