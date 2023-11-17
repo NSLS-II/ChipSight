@@ -134,6 +134,7 @@ class ChipScannerMessageManager:
             self.bluesky_env.chip_scanner.nudge_by(
                 payload.x_delta,
                 payload.y_delta,
+                payload.z_delta
             )
         )
         response_metadata.status_msg = (
