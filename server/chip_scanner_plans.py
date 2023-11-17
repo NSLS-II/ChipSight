@@ -297,9 +297,10 @@ class ChipScanner(Device):
         else:
             yield from bps.mv(self.x, x, self.y, y, self.z, z)
 
-    def nudge_by(self, x, y):
+    def nudge_by(self, delta_x, delta_y, delta_z):
         yield from self.drive_to_position(
-            self.x.get().user_readback + x, self.y.get().user_readback + y
+            self.x.get().user_readback + delta_x, self.y.get().user_readback + delta_y,
+            self.z.get().user_readback + delta_z
         )
 
     def drive_to_fiducial(self, location_name):
