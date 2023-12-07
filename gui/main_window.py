@@ -1,43 +1,44 @@
 from datetime import datetime
 from typing import Any, Dict
 
+from qmicroscope.microscope import Microscope
+from qmicroscope.plugins.c2c_plugin import C2CPlugin
+from qmicroscope.plugins.crosshair_plugin import CrossHairPlugin
+from qmicroscope.plugins.mousewheel_camera_zoom import MouseWheelCameraZoomPlugin
 from qtpy import QtCore
 from qtpy.QtWidgets import (
+    QDockWidget,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
+    QPushButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QPushButton
 )
 
 from gui.chip_widgets import BlockGridWidget, ChipGridWidget
 from gui.collection_queue import CollectionQueueWidget
 from gui.dialogs import LoginDialog
-from gui.utils import send_message_to_server, create_execute_action_request
-from qmicroscope.microscope import Microscope
-from qmicroscope.plugins.c2c_plugin import C2CPlugin
-from qmicroscope.plugins.crosshair_plugin import CrossHairPlugin
-from qmicroscope.plugins.mousewheel_camera_zoom import MouseWheelCameraZoomPlugin
+from gui.utils import create_execute_action_request, send_message_to_server
 from gui.websocket_client import WebSocketClient
 from gui.widgets import ControlPanelWidget
 from model.chip import Chip
 from model.comm_protocol import (
     ClearQueue,
+    ClickToCenter,
     CollectNeighborhood,
     CollectRow,
     ErrorResponse,
     ExecuteActionResponse,
     Message,
     PayloadType,
+    PointDelta,
     QueueActionResponse,
     RemoveFromQueue,
     StatusResponse,
-    ClickToCenter,
-    PointDelta,
-    VideoDimensions
+    VideoDimensions,
 )
 
 
@@ -54,25 +55,95 @@ class MainWindow(QMainWindow):
         self.websocket_client.message_received.connect(self.handle_server_response)
         self.websocket_client.connection_status.connect(self.handle_connection_status)
         self.websocket_client.start()
-        
+
         self.setWindowTitle("ChipSight")
 
-        # Main layout
-        main_layout = QHBoxLayout()
+        self.create_chip_grid_widget()
+        self.create_qmicroscope_widget()
+        self.create_control_panel_widget()
+        self.create_block_grid_widget()
 
-        # Left Layout (Chip Grid, Queue List, Action Buttons, and Status Window)
-        left_layout = QVBoxLayout()
-        main_layout.addLayout(left_layout)
+        # Setting the main layout
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
 
-        # Chip Label
-        self.chip_label = QLabel("Current chip: Chip01")
-        left_layout.addWidget(self.chip_label)
+        if not self.config.get("test", False):
+            self.show_login_modal()
 
+        self.update()
+
+    def create_chip_grid_widget(self):
         self.chip_grid = ChipGridWidget(
             chip=self.chip, button_size=self.config["chip_grid"]["button_size"]
         )
         self.chip_grid.last_selected_signal.connect(self.set_last_selected)
-        left_layout.addWidget(self.chip_grid)
+
+        # Chip grid dock
+        self.chip_grid_dock = QDockWidget("Current Chip: Chip01", self)
+        self.chip_grid_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+        )
+        self.chip_grid_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.addDockWidget(
+            QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.chip_grid_dock
+        )
+        self.chip_grid_dock.setWidget(self.chip_grid)
+
+    def create_block_grid_widget(self):
+        # Block Label
+        self.block_grid = BlockGridWidget(
+            self.chip, button_size=self.config["block_grid"]["button_size"]
+        )
+        self.block_grid_dock = QDockWidget("Current city block: A1", self)
+        self.block_grid_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+        )
+        self.block_grid_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.addDockWidget(
+            QtCore.Qt.DockWidgetArea.RightDockWidgetArea, self.block_grid_dock
+        )
+        self.block_grid_dock.setWidget(self.block_grid)
+
+    def create_qmicroscope_widget(self):
+        # Setup Q microscope
+        plugins = [C2CPlugin, CrossHairPlugin, MouseWheelCameraZoomPlugin]
+        self.microscope = Microscope(self, viewport=False, plugins=plugins)  # type: ignore
+        self.microscope.scale = [0, 400]
+        self.microscope.fps = 30
+        # Adding camera urls to MouseWheelCameraZoomPlugin
+        self.microscope.plugins["MouseWheelCameraZoomPlugin"].urls = self.config[
+            "sample_cam"
+        ]["urls"]
+        # C2CPlugin provides pixel co-ordinates of click, and zoom level
+        self.microscope.plugins["C2CPlugin"].clicked_signal.clicked.connect(
+            self.click_to_center
+        )
+        self.microscope.acquire(True)
+        self.microscope_dock = QDockWidget("Microscope", self)
+        self.microscope_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
+        )
+        self.microscope_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.addDockWidget(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.microscope_dock
+        )
+        self.microscope_dock.setWidget(self.microscope)
+
+    def create_control_panel_widget(self):
+        # Left Layout (Queue List, Action Buttons, and Status Window)
+        left_layout = QVBoxLayout()
 
         # Data collection parameters
         left_layout.addWidget(QLabel("Data collection parameters"))
@@ -100,32 +171,21 @@ class MainWindow(QMainWindow):
         fidu_buttons = ControlPanelWidget(websocket_client=self.websocket_client)
         left_layout.addWidget(fidu_buttons)
 
-        # left_layout.addWidget(nudge_widget)
-
-        # Right Layout (Block Label and Block Grid)
-        right_layout = QVBoxLayout()
-        main_layout.addLayout(right_layout)
-
-        # Setup Q microscope
-        plugins=[C2CPlugin, CrossHairPlugin, MouseWheelCameraZoomPlugin]
-        self.microscope = Microscope(self, viewport=False, plugins=plugins)  # type: ignore
-        self.microscope.scale = [0, 400]
-        self.microscope.fps = 30
-        # Adding camera urls to MouseWheelCameraZoomPlugin
-        self.microscope.plugins["MouseWheelCameraZoomPlugin"].urls = self.config["sample_cam"]["urls"]
-        # C2CPlugin provides pixel co-ordinates of click, and zoom level
-        self.microscope.plugins["C2CPlugin"].clicked_signal.clicked.connect(self.click_to_center)
-        right_layout.addWidget(self.microscope)
-        self.microscope.acquire(True)
-
-        # Block Label
-        self.block_label = QLabel("Current city block: A1")
-        right_layout.addWidget(self.block_label)
-
-        self.block_grid = BlockGridWidget(
-            self.chip, button_size=self.config["block_grid"]["button_size"]
+        self.control_panel_dock = QDockWidget("Control Panel", self)
+        self.control_panel_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            | QDockWidget.DockWidgetFeature.DockWidgetMovable
         )
-        right_layout.addWidget(self.block_grid)
+        self.control_panel_dock.setAllowedAreas(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea
+            | QtCore.Qt.DockWidgetArea.RightDockWidgetArea
+        )
+        self.addDockWidget(
+            QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, self.control_panel_dock
+        )
+        self.control_panel_widget = QWidget()
+        self.control_panel_widget.setLayout(left_layout)
+        self.control_panel_dock.setWidget(self.control_panel_widget)
 
         # Status window
         self.status_window = QTextEdit()
@@ -160,41 +220,33 @@ class MainWindow(QMainWindow):
 
         # Push the layouts up by adding stretch at the end
         left_layout.addStretch()
-        right_layout.addStretch()
-
-        # Setting the main layout
-        main_widget = QWidget()
-        main_widget.setLayout(main_layout)
-        self.setCentralWidget(main_widget)
-
-        if not self.config.get("test", False):
-            self.show_login_modal()
-
-        self.update()
 
     def click_to_center(self, data):
         y_delta = data["y_pixel_delta"]
         x_delta = data["x_pixel_delta"]
         pd = PointDelta(x_delta=x_delta, y_delta=y_delta)
-        vd = VideoDimensions(width=self.microscope.view.viewport().width(),
-                             height=self.microscope.view.viewport().height())
-        zoom_level = self.microscope.plugins["MouseWheelCameraZoomPlugin"].current_url_index
-        c2c_payload = ClickToCenter(pixel_delta=pd,
-                                    video_dimensions=vd,
-                                    zoom_level=zoom_level)
+        vd = VideoDimensions(
+            width=self.microscope.view.viewport().width(),
+            height=self.microscope.view.viewport().height(),
+        )
+        zoom_level = self.microscope.plugins[
+            "MouseWheelCameraZoomPlugin"
+        ].current_url_index
+        c2c_payload = ClickToCenter(
+            pixel_delta=pd, video_dimensions=vd, zoom_level=zoom_level
+        )
         print(c2c_payload)
-        send_message_to_server(self.websocket_client, 
-                               create_execute_action_request(c2c_payload, self.websocket_client.uuid))
-
-
+        send_message_to_server(
+            self.websocket_client,
+            create_execute_action_request(c2c_payload, self.websocket_client.uuid),
+        )
 
     def handle_connection_status(self, connection_status: str):
         self.connection_status_value_label.setText(connection_status)
         if connection_status == "Disconnected":
             self.reconnect_button.setEnabled(True)
         else:
-            self.reconnect_button.setEnabled(False) 
-
+            self.reconnect_button.setEnabled(False)
 
     def show_login_modal(self):
         self.login_modal = LoginDialog(
@@ -262,13 +314,13 @@ class MainWindow(QMainWindow):
 
     def update(self):
         # update chip label
-        self.chip_label.setText(f"Current chip: {self.chip.name}")
+        self.chip_grid_dock.setWindowTitle(f"Current chip: {self.chip.name}")
 
         self.chip_grid.update_widget()
 
         # update block label
         block_address = f"{chr(65+self.chip_grid.last_selected[0])}{self.chip_grid.last_selected[1]+1}"
-        self.block_label.setText(f"Current city block: {block_address}")
+        self.block_grid_dock.setWindowTitle(f"Current city block: {block_address}")
 
         self.block_grid.update_widget()
 
