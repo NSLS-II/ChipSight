@@ -385,6 +385,8 @@ class ChipScanner(Device):
         return self.F0, self.F1, self.F2, self.F0_enc, self.F1_enc, self.F2_enc
     
     def save_fiducials(self, filepath):
+        if Path(filepath).exists():
+            Path(filepath).unlink()
         with open(filepath, 'ab') as f:
             for arr in self.get_fiducials():
                 np.save(f, arr)
