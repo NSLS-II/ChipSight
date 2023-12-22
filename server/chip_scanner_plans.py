@@ -18,10 +18,8 @@ from ophyd import Device, EpicsMotor
 from ophyd.signal import EpicsSignal, EpicsSignalRO
 from ophyd.status import SubscriptionStatus
 
-from server.bluesky_env import RE, db
 from server.devices import cam_7, cam_8, shutter_bcu, trans_bcu, trans_ri
 
-db.reg.register_handler(EigerHandlerMX.spec, EigerHandlerMX)
 
 vector = VectorProgram("XF:17IDC-ES:FMX{Gon:1-Vec}", name="vector")
 zebra = Zebra("XF:17IDC-ES:FMX{Zeb:3}:", name="zebra")
@@ -577,7 +575,7 @@ class ChipScanner(Device):
         #path = '/nsls2/data/fmx/proposals/commissioning/pass-312064/312064-20230706-fuchs/mx312064-1'
         if not self.filepath:
             print(f'Must set filepath attribute for this chip scanner object before taking data, to determine location where the file will be saved.')
-            raise Exception('Filepath not found')
+            raise Exception(f'Filepath not found: {self.filepath}')
         eiger_single.cam.fw_num_images_per_file.put(triggers)
         eiger_single.cam.file_path.put(self.filepath)
         if not eiger_single.cam.file_path_exists.get():
@@ -817,6 +815,10 @@ class OxfordChip(ChipScanner):
                          8, 8, 800, 800,
                          20, 20, 125, 125,
                          cam_7, cam_8, **kwargs)
+        
+    def sleep_plan(self, time):
+        yield from bps.sleep(time)
+
 
 chip_scanner = OxfordChip(name='chip_scanner')
 
@@ -911,7 +913,7 @@ def getDetectorDist(configStr = 'Robot'):
 
 def multiple_chip_neighbourhoods(neighbourhood_list, wait_time = 20, recenter = True):
     for neighbourhood in neighbourhood_list:
-        RE(chip_scanner.ppmac_neighbourhood_scan(neighbourhood, wait_time, recenter = recenter))
+        yield from chip_scanner.ppmac_neighbourhood_scan(neighbourhood, wait_time, recenter = recenter)
         
 def chip_line_of_blocks(line, wait_time = 20):
     neighbourhoods = []

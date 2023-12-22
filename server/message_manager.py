@@ -24,7 +24,7 @@ from model.comm_protocol import (
     SetFiducial,
     ClickToCenter
 )
-
+from multiprocessing import Pipe
 from .manager import ConnectionManager
 from .devices import cam_7, cam_8
 
@@ -32,7 +32,7 @@ T = TypeVar("T", bound=PayloadType)
 
 
 class ChipScannerMessageManager:
-    def __init__(self, connection_manager: ConnectionManager, bluesky_env, config):
+    def __init__(self, connection_manager: ConnectionManager, bluesky_env, config, proposal_config):
         self.name = "Chip scanner manager"
         self.conn_manager = connection_manager
         self.bluesky_env = bluesky_env
@@ -50,9 +50,11 @@ class ChipScannerMessageManager:
             CollectQueue: self.collect_queue,
             ClickToCenter: self.click_to_center
         }
-        p = Path(self.config["fiducial_file"])
-        if p.exists():
-            self.bluesky_env.chip_scanner.load_fiducials(str(p))
+        
+
+        self.parent_conn, self.child_conn = Pipe()
+        self.worker_process = bluesky_env.RunEngineWorker(conn=self.child_conn, config=config, proposal_config=proposal_config)
+        self.worker_process.start()
 
     async def process_message(self, data: Message, user_id: str):
         if isinstance(data.metadata, QueueRequest):
@@ -96,7 +98,8 @@ class ChipScannerMessageManager:
         self, metadata: ExecuteRequest, payload: Optional[PayloadType]
     ):
         if payload and type(payload) in self.valid_immediate_requests:
-            run_engine_state = self.bluesky_env.RE.state
+            # run_engine_state = self.bluesky_env.RE.state
+            run_engine_state = "idle"
             if run_engine_state == "idle":
                 await self.valid_immediate_requests[type(payload)](
                     ExecuteActionResponse(), payload
@@ -123,9 +126,12 @@ class ChipScannerMessageManager:
     async def go_to_fiducial(
         self, response_metadata: MetadataType, payload: GoToFiducial
     ):
+        """
         self.bluesky_env.RE(
             self.bluesky_env.chip_scanner.drive_to_fiducial(payload.name)
         )
+        """
+        self.parent_conn.send({"action": "execute_plan", "duration": 1200})
         response_metadata.status_msg = f"Going to fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)

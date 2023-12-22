@@ -29,11 +29,11 @@ else:
     bluesky_env = Mock()
     bluesky_env.RE.state = "idle"
 
-bluesky_env.chip_scanner.filepath = proposal_config["path"]
+# bluesky_env.chip_scanner.filepath = proposal_config["path"]
 
 conn_manager = ConnectionManager()
 csm_manager = ChipScannerMessageManager(
-    connection_manager=conn_manager, bluesky_env=bluesky_env, config=config
+    connection_manager=conn_manager, bluesky_env=bluesky_env, config=config, proposal_config=proposal_config
 )
 secrets = json.load(open("secrets.json", "r"))
 
