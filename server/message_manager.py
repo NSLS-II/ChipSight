@@ -22,7 +22,8 @@ from model.comm_protocol import (
     QueueActionResponse,
     QueueRequest,
     SetFiducial,
-    ClickToCenter
+    ClickToCenter,
+    SetGovernorState
 )
 from multiprocessing import Pipe
 from .manager import ConnectionManager
@@ -48,7 +49,8 @@ class ChipScannerMessageManager:
             ClearQueue: self.clear_queue,
             NudgeGonio: self.nudge_gonio,
             CollectQueue: self.collect_queue,
-            ClickToCenter: self.click_to_center
+            ClickToCenter: self.click_to_center,
+            SetGovernorState: self.set_governor_state
         }
         
 
@@ -123,28 +125,28 @@ class ChipScannerMessageManager:
                     client_id=metadata.client_id,
                 )
 
+    async def set_governor_state(
+            self, response_metadata: MetadataType, payload: SetGovernorState
+    ):
+        self.parent_conn.send(payload)
+        response_metadata.status_msg = f"Going to Governor state {payload.state}"
+        await self.conn_manager.broadcast(
+            Message(metadata=response_metadata, payload=payload)
+        )
+
     async def go_to_fiducial(
         self, response_metadata: MetadataType, payload: GoToFiducial
     ):
-        """
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.drive_to_fiducial(payload.name)
-        )
-        """
-        self.parent_conn.send({"action": "execute_plan", "duration": 1200})
+        
+        self.parent_conn.send(payload)
         response_metadata.status_msg = f"Going to fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def nudge_gonio(self, response_metadata: MetadataType, payload: NudgeGonio):
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.nudge_by(
-                payload.x_delta,
-                payload.y_delta,
-                payload.z_delta
-            )
-        )
+        self.parent_conn.send(payload)
+        
         response_metadata.status_msg = (
             f"Nudging gonio by x={payload.x_delta}, y={payload.y_delta}"
         )
@@ -161,14 +163,8 @@ class ChipScannerMessageManager:
         final_y_pixel_delta = payload.pixel_delta.y_delta * (rois[payload.zoom_level].size.y.get() / payload.video_dimensions.height)
         x_microns = final_x_pixel_delta * zoom_levels[payload.zoom_level]
         y_microns = final_y_pixel_delta * zoom_levels[payload.zoom_level]
-        print(x_microns, y_microns)
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.nudge_by(
-                x_microns,
-                y_microns,
-                0
-            )
-        )
+        nudge_payload = NudgeGonio(x_delta=x_microns, y_delta=y_microns, z_delta=0)
+        self.parent_conn.send(nudge_payload)
         
         response_metadata.status_msg = (
             f"Nudging gonio by x={x_microns}, y={y_microns}"
@@ -179,21 +175,14 @@ class ChipScannerMessageManager:
 
 
     async def set_fiducial(self, response_metadata: MetadataType, payload: SetFiducial):
-        self.bluesky_env.chip_scanner.manual_set_fiducial(payload.name)
-        if self.bluesky_env.chip_scanner.F0 is not None and self.bluesky_env.chip_scanner.F1 is not None and self.bluesky_env.chip_scanner.F2 is not None:
-            self.bluesky_env.chip_scanner.save_fiducials(self.config["fiducial_file"])
+        self.parent_conn.send(payload)
         response_metadata.status_msg = f"Setting fiducial {payload.name}"
         await self.conn_manager.broadcast(
             Message(metadata=response_metadata, payload=payload)
         )
 
     async def move_gonio(self, response_metadata: MetadataType, payload: MoveGonio):
-        self.bluesky_env.RE(
-            self.bluesky_env.chip_scanner.drive_to_position(
-                payload.x_pos,
-                payload.y_pos,
-            )
-        )
+        
         response_metadata.status_msg = (
             f"Moving gonio to x={payload.x_pos}, y={payload.y_pos}"
         )

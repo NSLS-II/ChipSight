@@ -179,6 +179,8 @@ class SetFiducial(Payload):
     payload_type: Literal["set_fiducial"] = "set_fiducial"
     name: str
 
+class ClearFiducials(Payload):
+    payload_type: Literal["clear_fiducials"] = "clear_fiducials"
 
 class GoToFiducial(Payload):
     """
@@ -262,17 +264,24 @@ class RemoveFromQueue(Payload):
     index: int
 
 
+class SetGovernorState(Payload):
+    payload_type: Literal["set_governor_state"] = "set_governor_state"
+    state: str
+
+
 PayloadType = Union[
     NudgeGonio,
     MoveGonio,
     SetFiducial,
+    ClearFiducials,
     GoToFiducial,
     CollectNeighborhood,
     CollectRow,
     ClearQueue,
     CollectQueue,
     RemoveFromQueue,
-    ClickToCenter
+    ClickToCenter,
+    SetGovernorState
 ]
 
 # =============================================================================

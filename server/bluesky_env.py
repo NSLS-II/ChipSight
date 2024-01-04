@@ -8,7 +8,30 @@ from bluesky.run_engine import RunEngine, get_bluesky_event_loop
 from bluesky.utils import PersistentDict
 from databroker import Broker
 
-from server.chip_scanner_plans import BL_calibration, chip_scanner
+from server.chip_scanner_plans import BL_calibration, chip_scanner, govStateSet
+from model.comm_protocol import (
+    ClearQueue,
+    CollectNeighborhood,
+    CollectQueue,
+    CollectRow,
+    ErrorResponse,
+    ExecuteActionResponse,
+    ExecuteRequest,
+    GoToFiducial,
+    LoginResponse,
+    Message,
+    MetadataType,
+    MoveGonio,
+    NudgeGonio,
+    PayloadType,
+    QueueActionResponse,
+    QueueRequest,
+    SetFiducial,
+    ClickToCenter,
+    SetGovernorState
+)
+from typing import Dict, Type,Callable
+import traceback
 
 
 class RunEngineWorker(Process):
@@ -18,6 +41,7 @@ class RunEngineWorker(Process):
         self.conn = conn
         self.config = config
         self.proposal_config = proposal_config
+        
 
     def initialize_run_engine(self):
         self.RE = RunEngine()
@@ -49,18 +73,40 @@ class RunEngineWorker(Process):
                 break
             # elif isinstance(message, dict) and message["action"] == "execute_plan":
             else:
-                plan = chip_scanner.ppmac_neighbourhood_scan("A1", 20)
-                try:
-                    print("running plan")
-                    self.conn.send(
-                        {"status": f"running plan for {message['duration']}"}
-                    )
-                    self.RE(plan)
-                    self.conn.send({"status": "completed"})
-                    print("Completed plan")
-                except Exception as e:
-                    print(f"Failed plan {e}")
-                    self.conn.send({"status": "failed", "error": str(e)})
+                plan = self.plan_selector(payload=message)
+                if plan:
+                    try:
+                        print("running plan")
+                        self.conn.send(
+                            {"status": f"running plan for {message}"}
+                        )
+                        self.RE(plan)
+                        self.conn.send({"status": "completed"})
+                        print("Completed plan")
+                    except Exception as e:
+                        print(f"Failed plan {e}")
+                        self.conn.send({"status": "failed", "error": str(e), "traceback": traceback.format_exc()})
+
+    def plan_selector(self, payload):
+        if isinstance(payload, GoToFiducial):
+            return chip_scanner.drive_to_fiducial(payload.name)
+        elif isinstance(payload, NudgeGonio):
+            return chip_scanner.nudge_by(
+                payload.x_delta,
+                payload.y_delta,
+                payload.z_delta
+            )
+        elif isinstance(payload, SetFiducial):
+            chip_scanner.manual_set_fiducial(payload.name)
+            if chip_scanner.F0 is not None and chip_scanner.F1 is not None and chip_scanner.F2 is not None:
+                chip_scanner.save_fiducials(self.config["fiducial_file"])
+        elif isinstance(payload, MoveGonio):
+            return chip_scanner.drive_to_position(
+                payload.x_pos,
+                payload.y_pos,
+            )
+        elif isinstance(payload, SetGovernorState):
+            govStateSet(payload.state, configStr="Chip_Scanner")
 
 
 def run_worker(worker):
