@@ -9,7 +9,9 @@ from qtpy.QtWidgets import (
     QPushButton,
     QVBoxLayout,
 )
-
+from gui.utils import send_message_to_server, create_execute_action_request
+from model.comm_protocol import SetGovernorState
+from .websocket_client import WebSocketClient
 
 class LoadChipDialog(QDialog):
     def __init__(self, parent=None):
@@ -67,3 +69,41 @@ class LoginDialog(QDialog):
     def open_browser(self):
         if self.server_url:
             QDesktopServices.openUrl(QUrl(self.server_url))
+
+class GovernorStateMachineDialog(QDialog):
+    def __init__(self, websocket_client: WebSocketClient):
+        super().__init__()
+        self.setWindowTitle("Set Governor State")
+        self.CE = QPushButton("CE", self)
+        self.CA = QPushButton("CA", self)
+        self.CD = QPushButton("CD", self)
+        self.CA.clicked.connect(self.go_to_ca)
+        self.CD.clicked.connect(self.go_to_cd)
+        self.CE.clicked.connect(self.go_to_ce)
+
+        # self.arrowWidget = ArrowWidget(self)
+        # self.arrowWidget.connectButtons(self.button1, self.button2)
+
+        layout = QHBoxLayout()
+        layout.addWidget(self.CE)
+        layout.addWidget(self.CA)
+        # layout.addWidget(self.arrowWidget)  # This widget draws arrows between the buttons
+        layout.addWidget(self.CD)
+
+        self.setLayout(layout)
+        self.websocket_client = websocket_client
+    
+    def go_to_ce(self):
+        send_message_to_server(self.websocket_client, 
+                               create_execute_action_request(SetGovernorState(state="CE"), 
+                                                             client_id=self.websocket_client.uuid))
+
+    def go_to_ca(self):
+        send_message_to_server(self.websocket_client, 
+                               create_execute_action_request(SetGovernorState(state="CA"), 
+                                                             client_id=self.websocket_client.uuid))
+    
+    def go_to_cd(self):
+        send_message_to_server(self.websocket_client, 
+                               create_execute_action_request(SetGovernorState(state="CD"), 
+                                                             client_id=self.websocket_client.uuid))

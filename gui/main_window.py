@@ -16,11 +16,12 @@ from qtpy.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QAction
 )
 
 from gui.chip_widgets import BlockGridWidget, ChipGridWidget
 from gui.collection_queue import CollectionQueueWidget
-from gui.dialogs import LoginDialog
+from gui.dialogs import LoginDialog, GovernorStateMachineDialog
 from gui.utils import create_execute_action_request, send_message_to_server
 from gui.websocket_client import WebSocketClient
 from gui.widgets import ControlPanelWidget
@@ -57,6 +58,10 @@ class MainWindow(QMainWindow):
         self.websocket_client.start()
 
         self.setWindowTitle("ChipSight")
+        self.tool_bar = self.addToolBar("General")
+        self.governor_state_dialog_open_action = QAction("&Governor State", self)
+        self.tool_bar.addAction(self.governor_state_dialog_open_action)
+        self.governor_state_dialog_open_action.triggered.connect(self.open_governor_dialog)
 
         self.create_chip_grid_widget()
         self.create_qmicroscope_widget()
@@ -71,6 +76,11 @@ class MainWindow(QMainWindow):
             self.show_login_modal()
 
         self.update()
+
+    def open_governor_dialog(self):
+        self.governor_dialog = GovernorStateMachineDialog(self.websocket_client)
+        self.governor_dialog.show()
+
 
     def create_chip_grid_widget(self):
         self.chip_grid = ChipGridWidget(
